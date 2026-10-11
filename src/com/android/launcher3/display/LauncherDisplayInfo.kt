@@ -23,7 +23,6 @@ import android.util.ArrayMap
 import android.util.ArraySet
 import android.util.DisplayMetrics
 import android.util.Log
-import android.view.Display
 import android.view.DisplayCutout
 import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
@@ -85,6 +84,7 @@ constructor(
 
     /** Returns whether the taskbar is forced to be pinned when home is visible. */
     private val mIsDesktopFormFactor: Boolean = isDesktopFormFactor
+    private val mIsExternalDisplay: Boolean = wmProxy.isExternalDisplay(context)
 
     /**
      * Returns whether the taskbar should be pinned, and showing desktop tasks, because the display
@@ -93,6 +93,12 @@ constructor(
     val showDesktopTaskbarForFreeformDisplay = wmProxy.showDesktopTaskbarForFreeformDisplay(context)
 
     @JvmField val isNightModeActive: Boolean = config.isNightModeActive
+
+    /**
+     * Returns whether the display is landscape at ROTATION_0
+     */
+    val isDefaultLandscape: Boolean =
+        normalizedDisplayInfo.size.x > normalizedDisplayInfo.size.y
 
     // Used for testing
     init {
@@ -145,7 +151,7 @@ constructor(
     fun isLargeScreen(bounds: WindowBounds): Boolean =
         mIsDesktopFormFactor ||
             smallestSizeDp(bounds) >= WindowManagerProxy.MIN_TABLET_WIDTH ||
-            context.display.displayId != Display.DEFAULT_DISPLAY
+            mIsExternalDisplay
 
     /** Returns smallest size in dp for given bounds. */
     fun smallestSizeDp(bounds: WindowBounds): Float =

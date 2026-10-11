@@ -49,6 +49,8 @@ data class DeviceProperties(
     val insets: Rect,
     val deviceConfiguration: DeviceConfiguration,
     val taskbarConfiguration: TaskbarConfiguration,
+    val densityDpi: Int,
+    val isDefaultLandscape: Boolean
 ) {
 
     /**
@@ -59,7 +61,7 @@ data class DeviceProperties(
         get() = isPhone
 
     fun createWindowBounds() =
-        WindowBounds(widthPx, heightPx, availableWidthPx, availableHeightPx, rotationHint)
+        WindowBounds(widthPx, heightPx, availableWidthPx, availableHeightPx, rotationHint, densityDpi)
 
     companion object Factory {
         // b/419264328 adding here all the improvements/cleanup for this class
@@ -102,6 +104,8 @@ data class DeviceProperties(
                                 (taskbarOrBubbleBarOnPhones &&
                                     deviceConfiguration.isGestureMode)) && isTaskbarDrawnInProcess
                     ),
+                densityDpi = windowBounds.densityDpi,
+                isDefaultLandscape = info.isDefaultLandscape,
             )
         }
     }
