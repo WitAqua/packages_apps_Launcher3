@@ -543,7 +543,9 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // TODO(b/444744861): Update private space apps to have its own container.
         boolean isPinnable = itemInfo instanceof ItemInfoWithIcon info
                 && (info.runtimeStatusFlags & FLAG_NOT_PINNABLE) == 0;
-        if (Utilities.isWorkspaceEditAllowed(this)
+        if (isBubbleHome() && container == CONTAINER_DESKTOP) {
+            // Every app is on the bubble home screen, there is no drawer to find it again.
+        } else if (Utilities.isWorkspaceEditAllowed(this)
                 && (container == CONTAINER_HOTSEAT || container == CONTAINER_DESKTOP
                 || /* Folder */ container > 0)) {
             shortcuts.add(REMOVE);
@@ -684,7 +686,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
             case HINT_STATE_ORDINAL: {
                 Workspace<?> workspace = getWorkspace();
                 getStateManager().goToState(NORMAL);
-                if (workspace.getNextPage() != Workspace.DEFAULT_PAGE) {
+                if (workspace.getNextPage() != Workspace.DEFAULT_PAGE || isBubbleHome()) {
                     workspace.post(workspace::moveToDefaultScreen);
                 }
                 break;
@@ -770,7 +772,9 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                 list.add(new PortraitStatesTouchController(this));
                 break;
         }
-        list.add(new StatusBarTouchController(this, () -> this.isInState(LauncherState.NORMAL)));
+        // The bubble home screen scrolls vertically itself.
+        list.add(new StatusBarTouchController(this,
+                () -> this.isInState(LauncherState.NORMAL) && !isBubbleHome()));
         list.add(new TaskViewLaunchTouchController<>(this,
                 animController -> getStateManager().setCurrentUserControlledAnimation(
                         animController)));

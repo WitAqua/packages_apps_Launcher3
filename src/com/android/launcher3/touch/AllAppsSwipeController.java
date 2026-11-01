@@ -67,6 +67,10 @@ public class AllAppsSwipeController extends AbstractStateChangeTouchController {
         if (AbstractFloatingView.getTopOpenView(mLauncher) != null) {
             return false;
         }
+        if (mLauncher.isInState(NORMAL) && mLauncher.isBubbleHome()) {
+            // The bubble home screen scrolls vertically and lists every app, without a drawer.
+            return false;
+        }
         if (!mLauncher.isInState(NORMAL) && !mLauncher.isInState(ALL_APPS)) {
             // Don't listen for the swipe gesture if we are already in some other state.
             return false;

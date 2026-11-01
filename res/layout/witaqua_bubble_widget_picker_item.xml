@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<!-- A widget in the picker of the bubble home screen widgets. -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingHorizontal="24dp"
+    android:paddingVertical="8dp">
+
+    <ImageView
+        android:id="@id/bubble_widget_preview"
+        android:layout_width="96dp"
+        android:layout_height="56dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@id/bubble_widget_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceListItem" />
+
+        <TextView
+            android:id="@id/bubble_widget_app"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceListItemSecondary"
+            android:textColor="?android:attr/textColorSecondary" />
+    </LinearLayout>
+</LinearLayout>

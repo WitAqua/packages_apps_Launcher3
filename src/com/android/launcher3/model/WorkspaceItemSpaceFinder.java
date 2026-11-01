@@ -27,6 +27,8 @@ import com.android.launcher3.model.data.WorkspaceItemCoordinates;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.IntSet;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -88,7 +90,9 @@ public class WorkspaceItemSpaceFinder {
         // Use `itemsIdMap` as all the items are already loaded.
         synchronized (mDataModel) {
             for (ItemInfo info : mDataModel.itemsIdMap) {
-                if (info.container == LauncherSettings.Favorites.CONTAINER_DESKTOP) {
+                // The screen of the bubble home screen is not a page of the classic one.
+                if (info.container == LauncherSettings.Favorites.CONTAINER_DESKTOP
+                        && info.screenId != BubbleHome.BUBBLE_SCREEN_ID) {
                     ArrayList<ItemInfo> items = screenItems.get(info.screenId);
                     if (items == null) {
                         items = new ArrayList<>();

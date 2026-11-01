@@ -62,6 +62,8 @@ import com.android.launcher3.keyboard.ViewGroupFocusHelper;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayCallbacks;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.util.ArrayList;
 
 /**
@@ -277,7 +279,14 @@ public class DragLayer extends BaseDragLayer<Launcher> implements LauncherOverla
 
         float toScale = scale;
 
-        if (child instanceof DraggableView) {
+        int[] bubblePos = new int[2];
+        float bubbleScale = BubbleHome.getDropAnimationTarget(child, dragView,
+                dragView.getBlurSizeOutline(), bubblePos);
+        if (bubbleScale > 0) {
+            toX = bubblePos[0];
+            toY = bubblePos[1];
+            toScale = bubbleScale;
+        } else if (child instanceof DraggableView) {
             // This code is fairly subtle. Please verify drag and drop is pixel-perfect in a number
             // of scenarios before modifying (from all apps, from workspace, different grid-sizes,
             // shortcuts from in and out of Launcher etc).
@@ -495,7 +504,10 @@ public class DragLayer extends BaseDragLayer<Launcher> implements LauncherOverla
 
     @Override
     public void onOverlayScrollChanged(float progress) {
-        float alpha = 1 - Interpolators.DECELERATE_3.getInterpolation(progress);
+        // The bubbles stay visible while they slide away, until the overlay covers them.
+        float alpha = mContainer.isBubbleHome()
+                ? 1 - progress * progress * progress
+                : 1 - Interpolators.DECELERATE_3.getInterpolation(progress);
         float transX = getMeasuredWidth() * progress;
 
         if (mIsRtl) {

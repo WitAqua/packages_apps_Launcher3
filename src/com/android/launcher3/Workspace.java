@@ -176,6 +176,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import org.witaqua.launcher3.bubble.BubbleCellLayout;
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 /**
  * The workspace is a wide area with a wallpaper and a finite number of pages.
  * Each page contains a number of icons, folders or widgets the user can
@@ -446,7 +449,12 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         mWorkspaceFadeInAdjacentScreens = grid.shouldFadeAdjacentWorkspaceScreens();
 
         Rect padding = grid.getWorkspaceProfile().getWorkspacePadding();
-        setPadding(padding.left, padding.top, padding.right, padding.bottom);
+        if (mLauncher.isBubbleHome()) {
+            // The bubbles use the whole screen, there is no hotseat.
+            setPadding(0, 0, 0, 0);
+        } else {
+            setPadding(padding.left, padding.top, padding.right, padding.bottom);
+        }
         mInsets.set(insets);
 
         if (mWorkspaceFadeInAdjacentScreens) {
@@ -579,7 +587,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         // action for move/add to homescreen.
         // When a accessible drag is started by the folder, we only allow rearranging withing the
         // folder.
-        boolean addNewPage = !(options.isAccessibleDrag && dragObject.dragSource != this);
+        // The bubble home screen is a single page.
+        boolean addNewPage = !(options.isAccessibleDrag && dragObject.dragSource != this)
+                && !mLauncher.isBubbleHome();
         if (addNewPage) {
             mDeferRemoveExtraEmptyScreen = false;
             addExtraEmptyScreenOnDrag(dragObject);
@@ -769,7 +779,12 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         // created CellLayout.
         DeviceProfile dp = mLauncher.getDeviceProfile();
         CellLayout newScreen;
-        if (FOLDABLE_SINGLE_PAGE.get() && dp.getDeviceProperties().isTwoPanels()) {
+        if (mLauncher.isBubbleHome() && screenId == FIRST_SCREEN_ID) {
+            newScreen = new BubbleCellLayout(getContext());
+            // The page is laid out between the system bars, the neighbouring flowers are shown
+            // behind them.
+            setClipChildren(false);
+        } else if (FOLDABLE_SINGLE_PAGE.get() && dp.getDeviceProperties().isTwoPanels()) {
             newScreen = (CellLayout) LayoutInflater.from(getContext()).inflate(
                     R.layout.workspace_screen_foldable, this, false /* attachToRoot */);
         } else {
@@ -1895,6 +1910,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         if (draggableView != null) {
             draggableView.getSourceVisualDragBounds(dragRect);
+            if (drawable != null && BubbleHome.isBubble(child)) {
+                // The preview of a bubble is the whole bubble, its visual centre is its centre.
+                dragRect.set(0, 0, drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight());
+            }
             dragLayerY += dragRect.top;
         }
 
@@ -2613,6 +2632,10 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             enforceDragParity("onDragExit", -1, 0);
         }
 
+        if (getChildAt(DEFAULT_PAGE) instanceof BubbleCellLayout bubbles) {
+            bubbles.onDragExit();
+        }
+
         // Here we store the final page that will be dropped to, if the workspace in fact
         // receives the drop
         mDropToLayout = mDragTargetLayout;
@@ -2737,8 +2760,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      * coordinate space. The argument xy is modified with the return result.
      */
     private void mapPointFromSelfToChild(View v, float[] xy) {
-        xy[0] = xy[0] - v.getLeft();
-        xy[1] = xy[1] - v.getTop();
+        // The bubble page scrolls its content.
+        xy[0] = xy[0] - v.getLeft() + v.getScrollX();
+        xy[1] = xy[1] - v.getTop() + v.getScrollY();
     }
 
     /**
@@ -2781,6 +2805,12 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             } else {
                 mSpringLoadedDragController.setAlarm(mDragTargetLayout);
             }
+        }
+
+        if (getChildAt(DEFAULT_PAGE) instanceof BubbleCellLayout bubbles) {
+            // Scrolls to the previous or next flower near the edges, which are outside of the
+            // page as it is shrunk while dragging.
+            bubbles.onDragOver(d.y);
         }
 
         // Handle the drag over
@@ -2915,7 +2945,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     private boolean shouldUseHotseatAsDropLayout(DragObject dragObject) {
         Hotseat hotseat = mLauncher.getHotseat();
-        if (hotseat == null || !hotseat.isValidDropTarget(dragObject)) {
+        if (hotseat == null || !hotseat.isValidDropTarget(dragObject)
+                || mLauncher.isBubbleHome()) {
             return false;
         }
         getViewBoundsRelativeToWorkspace(hotseat.getShortcutsAndWidgets(), mTempRect);
@@ -3797,6 +3828,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
      * Calls {@link #snapToPage(int)} on the {@link #DEFAULT_PAGE}, then requests focus on it.
      */
     public void moveToDefaultScreen() {
+        if (getChildAt(DEFAULT_PAGE) instanceof BubbleCellLayout bubbles) {
+            bubbles.snapToDefaultPage(true /* animate */);
+        }
         int page = DEFAULT_PAGE;
         if (!workspaceInModalState() && getNextPage() != page) {
             snapToPage(page);

@@ -152,6 +152,8 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     private Rect mTouchArea = new Rect();
 
     private float mScaleForReorderBounce = 1f;
+    /** Scale of the item on the bubble home screen, the reorder scale applies on top of it. */
+    private float mBubbleScale = 1f;
 
     private static final Property<FolderIcon, Float> DOT_SCALE_PROPERTY
             = new Property<FolderIcon, Float>(Float.TYPE, "dotScale") {
@@ -774,8 +776,15 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     @Override
     public void setReorderBounceScale(float scale) {
         mScaleForReorderBounce = scale;
-        super.setScaleX(scale);
-        super.setScaleY(scale);
+        super.setScaleX(scale * mBubbleScale);
+        super.setScaleY(scale * mBubbleScale);
+    }
+
+    /** Sets the scale of the item on the bubble home screen. */
+    public void setBubbleScale(float scale) {
+        mBubbleScale = scale;
+        super.setScaleX(mScaleForReorderBounce * scale);
+        super.setScaleY(mScaleForReorderBounce * scale);
     }
 
     @Override

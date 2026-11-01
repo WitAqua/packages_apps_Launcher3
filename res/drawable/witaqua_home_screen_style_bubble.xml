@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<!-- Illustration of the bubble home screen: a flower of seven bubbles, with two rows of the neighbouring flowers above and below. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="112dp"
+    android:viewportWidth="64"
+    android:viewportHeight="112">
+    <path
+        android:fillColor="?android:attr/textColorSecondary"
+        android:fillAlpha="0.6"
+        android:pathData="M11,1h42a10,10 0 0 1 10,10v90a10,10 0 0 1 -10,10h-42a10,10 0 0 1 -10,-10v-90a10,10 0 0 1 10,-10z" />
+    <path
+        android:fillColor="?android:attr/colorBackground"
+        android:pathData="M11,3h42a8,8 0 0 1 8,8v90a8,8 0 0 1 -8,8h-42a8,8 0 0 1 -8,-8v-90a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="?android:attr/colorAccent"
+        android:fillAlpha="0.1"
+        android:pathData="M11,3h42a8,8 0 0 1 8,8v90a8,8 0 0 1 -8,8h-42a8,8 0 0 1 -8,-8v-90a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="?android:attr/colorAccent"
+        android:fillAlpha="0.35"
+        android:pathData="M21.5,15a3.5,3.5 0 1 0 7.0,0a3.5,3.5 0 1 0 -7.0,0zM35.5,15a3.5,3.5 0 1 0 7.0,0a3.5,3.5 0 1 0 -7.0,0zM14,27a4,4 0 1 0 8,0a4,4 0 1 0 -8,0zM27.5,24a4.5,4.5 0 1 0 9.0,0a4.5,4.5 0 1 0 -9.0,0zM42,27a4,4 0 1 0 8,0a4,4 0 1 0 -8,0zM14,85a4,4 0 1 0 8,0a4,4 0 1 0 -8,0zM27.5,88a4.5,4.5 0 1 0 9.0,0a4.5,4.5 0 1 0 -9.0,0zM42,85a4,4 0 1 0 8,0a4,4 0 1 0 -8,0zM21.5,97a3.5,3.5 0 1 0 7.0,0a3.5,3.5 0 1 0 -7.0,0zM35.5,97a3.5,3.5 0 1 0 7.0,0a3.5,3.5 0 1 0 -7.0,0z" />
+    <path
+        android:fillColor="?android:attr/colorAccent"
+        android:pathData="M19,43a6,6 0 1 0 12,0a6,6 0 1 0 -12,0zM33,43a6,6 0 1 0 12,0a6,6 0 1 0 -12,0zM12.5,56a5.5,5.5 0 1 0 11.0,0a5.5,5.5 0 1 0 -11.0,0zM25,56a7,7 0 1 0 14,0a7,7 0 1 0 -14,0zM40.5,56a5.5,5.5 0 1 0 11.0,0a5.5,5.5 0 1 0 -11.0,0zM19,69a6,6 0 1 0 12,0a6,6 0 1 0 -12,0zM33,69a6,6 0 1 0 12,0a6,6 0 1 0 -12,0z" />
+</vector>

@@ -32,6 +32,7 @@ import androidx.annotation.Nullable;
 
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.Flags;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
@@ -258,6 +259,14 @@ public class BaseDepthControllerImpl<
 
         int previousBlur = mCurrentBlur;
         int newBlur = shouldBlur() ? (int) (blurAmount * mMaxBlurRadius) : 0;
+        if (mContainer instanceof Launcher launcher && launcher.isBubbleHome()
+                && mCrossWindowBlursEnabled && !hasOpaqueBg) {
+            // The wallpaper behind the bubbles is always blurred, so that the blurred bubbles of
+            // the neighbouring flowers do not stand out. It is kept while the blurs are paused
+            // for the animations going home, which only animate the depth.
+            newBlur = Math.max(newBlur, launcher.getResources().getDimensionPixelSize(
+                    R.dimen.bubble_wallpaper_blur_radius));
+        }
         int delta = Math.abs(newBlur - previousBlur);
         if (skipSimilarBlur && delta < Utilities.dpToPx(1) && newBlur != 0 && previousBlur != 0
                 && blurAmount != 1f) {

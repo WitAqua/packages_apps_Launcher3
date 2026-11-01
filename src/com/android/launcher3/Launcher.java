@@ -252,6 +252,9 @@ import com.android.launcher3.widget.util.WidgetSizeHandler;
 import com.android.systemui.plugins.shared.LauncherOverlayManager;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayTouchProxy;
 
+import org.witaqua.launcher3.bubble.BubbleCellPosMapper;
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -385,6 +388,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected InstanceId mAllAppsSessionLogId;
     protected LauncherState mPrevLauncherState;
     private CellPosMapper mCellPosMapper = CellPosMapper.DEFAULT;
+    /** Whether the bubble home screen is shown, fixed for the lifetime of the activity. */
+    private Boolean mBubbleHome;
 
     private final CannedAnimationCoordinator mAnimationCoordinator =
             new CannedAnimationCoordinator(this);
@@ -680,8 +685,11 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (FOLDABLE_SINGLE_PAGE.get() && mDeviceProfile.getDeviceProperties().isTwoPanels()) {
             mCellPosMapper = new TwoPanelCellPosMapper(mDeviceProfile.inv.numColumns);
         } else {
-            mCellPosMapper = new CellPosMapper(mDeviceProfile.isVerticalBarLayout(),
-                    mDeviceProfile.getHotseatProfile().getNumShownIcons());
+            mCellPosMapper = isBubbleHome()
+                    ? new BubbleCellPosMapper(mDeviceProfile.isVerticalBarLayout(),
+                            mDeviceProfile.getHotseatProfile().getNumShownIcons())
+                    : new CellPosMapper(mDeviceProfile.isVerticalBarLayout(),
+                            mDeviceProfile.getHotseatProfile().getNumShownIcons());
         }
         mModelWriter = mModel.getWriter(true, this, modelCallbacks);
         updateFixedLandscape();
@@ -1067,7 +1075,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void onStateSetEnd(LauncherState state) {
         super.onStateSetEnd(state);
         getAppWidgetHolder().setStateIsNormal(state == LauncherState.NORMAL);
-        getWorkspace().setClipChildren(!state.hasFlag(FLAG_MULTI_PAGE));
+        // The neighbouring flowers of the bubble page are shown behind the system bars.
+        getWorkspace().setClipChildren(!state.hasFlag(FLAG_MULTI_PAGE) && !isBubbleHome());
 
         finishAutoCancelActionMode();
         removeActivityFlags(ACTIVITY_STATE_TRANSITION_ACTIVE);
@@ -1113,6 +1122,10 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected void onResume() {
         TraceHelper.INSTANCE.beginSection(ON_RESUME_EVT);
         super.onResume();
+        if (isBubbleHome() != BubbleHome.isEnabled(this)) {
+            // The home screen style changed in the settings.
+            recreate();
+        }
         mLauncherUiState.setIsResumedActivity(true);
         DragView.removeAllViews(this);
         TraceHelper.INSTANCE.endSection();
@@ -1181,6 +1194,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         mOverviewPanel = findViewById(R.id.overview_panel);
         mHotseat = findViewById(R.id.hotseat);
         mHotseat.setWorkspace(mWorkspace);
+        if (isBubbleHome()) {
+            // The bubble home screen has neither hotseat nor page indicator.
+            mHotseat.setIconsAlpha(0, Hotseat.ALPHA_CHANNEL_BUBBLE_HOME);
+            mHotseat.setQsbAlpha(0, Hotseat.ALPHA_CHANNEL_BUBBLE_HOME);
+            findViewById(R.id.page_indicator).setVisibility(View.GONE);
+        }
 
         // Setup the drag layer
         mDragLayer.setup(mDragController, mWorkspace);
@@ -2102,8 +2121,13 @@ public class Launcher extends StatefulActivity<LauncherState>
             if (boundAnim != null) {
                 // Animate all the applications up now
                 view.setAlpha(0f);
-                view.setScaleX(0f);
-                view.setScaleY(0f);
+                if (isBubbleHome() && view instanceof Reorderable reorderable) {
+                    // Bubbles are scaled by their page: the bounce scales on top of it.
+                    reorderable.setReorderBounceScale(0f);
+                } else {
+                    view.setScaleX(0f);
+                    view.setScaleY(0f);
+                }
                 boundAnim.play(createNewAppBounceAnimation(view, index++));
                 newItemsScreenId = presenterPos.screenId;
             }
@@ -2196,7 +2220,9 @@ public class Launcher extends StatefulActivity<LauncherState>
      * <p>
      * Implementation of the method from LauncherModel.Callbacks.
      */
-    public void finishBindingItems(IntSet pagesBoundFirst) {}
+    public void finishBindingItems(IntSet pagesBoundFirst) {
+        BubbleHome.addMissingApps(this);
+    }
 
     private boolean canAnimatePageChange() {
         if (mDragController.isDragging()) {
@@ -2248,8 +2274,19 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private ValueAnimator createNewAppBounceAnimation(View v, int i) {
-        ValueAnimator bounceAnim = new PropertyListBuilder().alpha(1).scale(1).build(v)
-                .setDuration(ItemInstallQueue.NEW_SHORTCUT_BOUNCE_DURATION);
+        ValueAnimator bounceAnim;
+        if (isBubbleHome() && v instanceof Reorderable reorderable) {
+            bounceAnim = ValueAnimator.ofFloat(0f, 1f);
+            bounceAnim.addUpdateListener(anim -> {
+                float progress = (float) anim.getAnimatedValue();
+                v.setAlpha(Math.min(1f, progress));
+                reorderable.setReorderBounceScale(progress);
+            });
+            bounceAnim.setDuration(ItemInstallQueue.NEW_SHORTCUT_BOUNCE_DURATION);
+        } else {
+            bounceAnim = new PropertyListBuilder().alpha(1).scale(1).build(v)
+                    .setDuration(ItemInstallQueue.NEW_SHORTCUT_BOUNCE_DURATION);
+        }
         bounceAnim.setStartDelay(i * ItemInstallQueue.NEW_SHORTCUT_STAGGER_DELAY);
         bounceAnim.setInterpolator(new OvershootInterpolator(BOUNCE_ANIMATION_TENSION));
         return bounceAnim;
@@ -2663,6 +2700,14 @@ public class Launcher extends StatefulActivity<LauncherState>
         modelCallbacks.setPagesToBindSynchronously(pages);
     }
 
+    /** Returns true if the bubble home screen is shown instead of the classic one. */
+    public boolean isBubbleHome() {
+        if (mBubbleHome == null) {
+            mBubbleHome = BubbleHome.isEnabled(this);
+        }
+        return mBubbleHome;
+    }
+
     @Override
     public CellPosMapper getCellPosMapper() {
         return mCellPosMapper;
@@ -2804,7 +2849,10 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     public Stream<SystemShortcut.Factory> getSupportedShortcuts(ItemInfo itemInfo) {
         int container = itemInfo.container;
-        if (container == CONTAINER_DESKTOP || container == CONTAINER_HOTSEAT) {
+        if (isBubbleHome() && container == CONTAINER_DESKTOP) {
+            // Every app is on the bubble home screen, there is no drawer to find it again.
+            return Stream.of(APP_INFO, WIDGETS, INSTALL);
+        } else if (container == CONTAINER_DESKTOP || container == CONTAINER_HOTSEAT) {
             return Stream.of(APP_INFO, WIDGETS, INSTALL, REMOVE);
         } else if (container == CONTAINER_ALL_APPS || container == CONTAINER_ALL_APPS_PREDICTION) {
             // TODO(b/444744861): Update private space apps to have its own container.

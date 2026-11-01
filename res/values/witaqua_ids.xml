@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- Blur radius last applied to a bubble -->
+    <item name="bubble_blur_radius" type="id" />
+
+    <!-- Bubble home screen widgets -->
+    <item name="bubble_widget_clear" type="id" />
+    <item name="bubble_widget_preview" type="id" />
+    <item name="bubble_widget_label" type="id" />
+    <item name="bubble_widget_app" type="id" />
+
+    <!-- Home screen style -->
+    <item name="home_screen_style_radio" type="id" />
+</resources>

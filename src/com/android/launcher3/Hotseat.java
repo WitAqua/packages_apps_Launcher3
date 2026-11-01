@@ -66,11 +66,13 @@ public class Hotseat extends CellLayout implements Insettable {
     public static final int ALPHA_CHANNEL_PREVIEW_RENDERER = 1;
     public static final int ALPHA_CHANNEL_TASKBAR_STASH = 2;
     public static final int ALPHA_CHANNEL_ASSISTANT_VISIBILITY = 3;
-    public static final int ALPHA_CHANNEL_CHANNELS_COUNT = 4;
+    public static final int ALPHA_CHANNEL_BUBBLE_HOME = 4;
+    public static final int ALPHA_CHANNEL_CHANNELS_COUNT = 5;
 
     @Retention(RetentionPolicy.RUNTIME)
     @IntDef({ALPHA_CHANNEL_TASKBAR_ALIGNMENT, ALPHA_CHANNEL_PREVIEW_RENDERER,
-            ALPHA_CHANNEL_TASKBAR_STASH, ALPHA_CHANNEL_ASSISTANT_VISIBILITY})
+            ALPHA_CHANNEL_TASKBAR_STASH, ALPHA_CHANNEL_ASSISTANT_VISIBILITY,
+            ALPHA_CHANNEL_BUBBLE_HOME})
     public @interface HotseatQsbAlphaId {
     }
 
@@ -442,7 +444,9 @@ public class Hotseat extends CellLayout implements Insettable {
                 "mIconsAlphaChannels",
                 "ALPHA_CHANNEL_TASKBAR_ALIGNMENT",
                 "ALPHA_CHANNEL_PREVIEW_RENDERER",
-                "ALPHA_CHANNEL_TASKBAR_STASH");
+                "ALPHA_CHANNEL_TASKBAR_STASH",
+                "ALPHA_CHANNEL_ASSISTANT_VISIBILITY",
+                "ALPHA_CHANNEL_BUBBLE_HOME");
         if (mQsbAlphaChannels != null) {
             mQsbAlphaChannels.dump(
                     prefix + "\t",
@@ -450,7 +454,9 @@ public class Hotseat extends CellLayout implements Insettable {
                     "mQsbAlphaChannels",
                     "ALPHA_CHANNEL_TASKBAR_ALIGNMENT",
                     "ALPHA_CHANNEL_PREVIEW_RENDERER",
-                    "ALPHA_CHANNEL_TASKBAR_STASH"
+                    "ALPHA_CHANNEL_TASKBAR_STASH",
+                    "ALPHA_CHANNEL_ASSISTANT_VISIBILITY",
+                    "ALPHA_CHANNEL_BUBBLE_HOME"
             );
         }
     }

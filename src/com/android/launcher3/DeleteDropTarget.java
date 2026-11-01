@@ -91,7 +91,8 @@ public class DeleteDropTarget extends ButtonDropTarget {
 
     @Override
     protected boolean supportsDrop(ItemInfo info) {
-        return true;
+        // Every app is on the bubble home screen, there is no drawer to find it again.
+        return !(mActivityContext instanceof Launcher launcher && launcher.isBubbleHome());
     }
 
     /**

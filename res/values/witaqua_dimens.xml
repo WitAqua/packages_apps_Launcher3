@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- Blur of the wallpaper behind the bubble home screen -->
+    <dimen name="bubble_wallpaper_blur_radius">12dp</dimen>
+</resources>

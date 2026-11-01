@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:title="@string/home_screen_style_title">
+
+    <org.witaqua.launcher3.bubble.HomeScreenStylePreference
+        android:key="home_screen_style_classic"
+        android:icon="@drawable/witaqua_home_screen_style_classic"
+        android:title="@string/home_screen_style_classic"
+        android:summary="@string/home_screen_style_classic_summary" />
+
+    <org.witaqua.launcher3.bubble.HomeScreenStylePreference
+        android:key="home_screen_style_bubble"
+        android:icon="@drawable/witaqua_home_screen_style_bubble"
+        android:title="@string/home_screen_style_bubble"
+        android:summary="@string/home_screen_style_bubble_summary" />
+
+</androidx.preference.PreferenceScreen>

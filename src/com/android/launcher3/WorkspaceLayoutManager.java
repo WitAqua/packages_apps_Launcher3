@@ -28,6 +28,8 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.IntSet;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 public interface WorkspaceLayoutManager {
 
     String TAG = "Launcher.Workspace";
@@ -95,6 +97,10 @@ public interface WorkspaceLayoutManager {
     default void addInScreen(View child, int container, int screenId, int x, int y,
             int spanX, int spanY) {
         if (container == LauncherSettings.Favorites.CONTAINER_DESKTOP) {
+            if (BubbleHome.isHiddenScreen(screenId)) {
+                // Item of the other home screen style.
+                return;
+            }
             if (getScreenWithId(screenId) == null) {
                 Log.e(TAG, "Skipping child, screenId " + screenId + " not found");
                 // DEBUGGING - Print out the stack trace to see where we are adding from

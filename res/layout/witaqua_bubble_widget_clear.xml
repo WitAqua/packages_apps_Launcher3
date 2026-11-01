@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<!-- Clears the widget of a slot of the bubble home screen. -->
+<ImageButton
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@id/bubble_widget_clear"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="?android:attr/selectableItemBackgroundBorderless"
+    android:contentDescription="@string/bubble_widget_clear"
+    android:scaleType="center"
+    android:src="@drawable/ic_gm_close_24" />

@@ -53,6 +53,7 @@ import java.util.Arrays
 import java.util.UUID
 import java.util.concurrent.Executor
 import javax.inject.Inject
+import org.witaqua.launcher3.bubble.BubbleHome
 
 /**
  * Context used just for preview. It also provides a few objects (e.g. UserCache) just for preview
@@ -87,6 +88,9 @@ constructor(
         val closestEvenPageId: Int = workspacePageId - (workspacePageId % 2)
         val selectionQuery =
             if (isTwoPanel) selectionForWorkspaceScreen(closestEvenPageId, closestEvenPageId + 1)
+            // The bubbles are stored on their own screen.
+            else if (BubbleHome.isEnabled(base))
+                selectionForWorkspaceScreen(BubbleHome.BUBBLE_SCREEN_ID)
             else selectionForWorkspaceScreen(workspacePageId)
 
         val builder = DaggerPreviewContext_PreviewAppComponent.builder().bindPrefs(prefs)

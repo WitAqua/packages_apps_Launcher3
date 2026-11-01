@@ -54,6 +54,7 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
@@ -160,6 +161,12 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private static final int[] STATE_PRESSED = new int[]{android.R.attr.state_pressed};
 
     private float mScaleForReorderBounce = 1f;
+    /** Scale of the item on the bubble home screen, the reorder scale applies on top of it. */
+    private float mBubbleScale = 1f;
+    /** Whether the item is shown as a bubble: its icon clipped to a circle, without label. */
+    private boolean mBubbleStyle;
+    private final Rect mClipIconBounds = new Rect();
+    private final Path mClipIconPath = new Path();
 
     private IntArray mBreakPointsIntArray;
     private CharSequence mLastOriginalText;
@@ -260,8 +267,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      * @param visible defines whether we should make the container visible or invisible.
      */
     public void setContainerTextVisibility(boolean visible) {
+        // Bubbles have no label.
         mTextAlphaMultiPropertyFactory.get(TEXT_ALPHA_INDEX_CONTAINER_VISIBILITY).setValue(
-                visible ? 1f : 0f);
+                visible && !mBubbleStyle ? 1f : 0f);
     }
 
     /**
@@ -948,7 +956,20 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public void onDraw(Canvas canvas) {
         drawSelectedBackgroundIfNecessary(canvas);
 
-        super.onDraw(canvas);
+        if (mBubbleStyle) {
+            // Only the icon is clipped, the dot is drawn over its edge as usual.
+            getIconBounds(mClipIconBounds);
+            mClipIconPath.reset();
+            mClipIconPath.addOval(mClipIconBounds.left + getScrollX(),
+                    mClipIconBounds.top + getScrollY(), mClipIconBounds.right + getScrollX(),
+                    mClipIconBounds.bottom + getScrollY(), Path.Direction.CW);
+            int count = canvas.save();
+            canvas.clipPath(mClipIconPath);
+            super.onDraw(canvas);
+            canvas.restoreToCount(count);
+        } else {
+            super.onDraw(canvas);
+        }
         drawDotIfNecessary(canvas);
         drawRunningAppIndicatorIfNecessary(canvas);
     }
@@ -1554,8 +1575,29 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @Override
     public void setReorderBounceScale(float scale) {
         mScaleForReorderBounce = scale;
-        super.setScaleX(scale);
-        super.setScaleY(scale);
+        super.setScaleX(scale * mBubbleScale);
+        super.setScaleY(scale * mBubbleScale);
+    }
+
+    /**
+     * Sets whether the item is shown as a bubble, as on the bubble home screen: its icon is
+     * clipped to a circle and it has no label.
+     */
+    public void setBubbleStyle(boolean bubble) {
+        if (mBubbleStyle != bubble) {
+            mBubbleStyle = bubble;
+            if (bubble) {
+                setContainerTextVisibility(false);
+            }
+            invalidate();
+        }
+    }
+
+    /** Sets the scale of the item on the bubble home screen. */
+    public void setBubbleScale(float scale) {
+        mBubbleScale = scale;
+        super.setScaleX(mScaleForReorderBounce * scale);
+        super.setScaleY(mScaleForReorderBounce * scale);
     }
 
     @Override

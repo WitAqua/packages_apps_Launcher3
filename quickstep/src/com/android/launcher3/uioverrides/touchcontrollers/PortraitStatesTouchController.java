@@ -20,6 +20,7 @@ import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
+import static com.android.launcher3.Utilities.EDGE_NAV_BAR;
 import static com.android.window.flags.Flags.betterDeskDeactivationInRecentsTransition;
 
 import android.view.MotionEvent;
@@ -56,6 +57,12 @@ public class PortraitStatesTouchController extends AbstractStateChangeTouchContr
 
     @Override
     protected boolean canInterceptTouch(MotionEvent ev) {
+        if (mLauncher.isInState(NORMAL) && mLauncher.isBubbleHome()
+                && (ev.getEdgeFlags() & EDGE_NAV_BAR) == 0) {
+            // The bubble home screen scrolls vertically and lists every app, without a drawer.
+            // Swipes from the navigation bar still go home or to overview.
+            return false;
+        }
         // If we are swiping to all apps instead of overview, allow it from anywhere.
         boolean interceptAnywhere = mLauncher.isInState(NORMAL);
         if (mCurrentAnimation != null) {

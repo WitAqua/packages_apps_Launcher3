@@ -35,6 +35,8 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.DefaultsValueProvider;
 import com.android.launcher3.util.Executors;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.util.Locale;
 
 /**
@@ -110,6 +112,10 @@ public class SessionCommitReceiver extends BroadcastReceiver {
     public static boolean isEnabled(Context context, UserHandle user) {
         if (user != null && UserCache.getInstance(context).getUserInfo(user).isPrivate()) {
             return false;
+        }
+        if (BubbleHome.isEnabled(context)) {
+            // The bubble home screen has no app drawer: every app must be on it.
+            return true;
         }
         return LauncherPrefs.getPrefs(context).getBoolean(ADD_ICON_PREFERENCE_KEY,
                 DefaultsValueProvider.get(context).getAddIconToHome());

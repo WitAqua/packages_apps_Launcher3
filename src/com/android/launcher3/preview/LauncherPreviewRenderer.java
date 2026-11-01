@@ -78,6 +78,10 @@ import com.android.launcher3.views.BaseDragLayer;
 import com.android.launcher3.widget.ColorsOverride;
 import com.android.launcher3.widget.LauncherWidgetHolder;
 
+import org.witaqua.launcher3.bubble.BubbleCellLayout;
+import org.witaqua.launcher3.bubble.BubbleCellPosMapper;
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -108,6 +112,9 @@ public class LauncherPreviewRenderer extends BaseContext
     private final Map<Integer, CellLayout> mWorkspaceScreens = new HashMap<>();
     private final ItemInflater<LauncherPreviewRenderer> mItemInflater;
     private final LauncherWidgetHolder mWidgetHolder;
+    /** Whether the bubble home screen is shown, in place of the classic one. */
+    private final boolean mBubbleHome;
+    private final CellPosMapper mCellPosMapper;
 
     public LauncherPreviewRenderer(Context context,
             int workspaceScreenId,
@@ -185,6 +192,16 @@ public class LauncherPreviewRenderer extends BaseContext
             mWorkspaceScreens.put(workspaceScreenId, firstScreen);
         }
 
+        mBubbleHome = BubbleHome.isEnabled(context)
+                && !mDp.getDeviceProperties().isTwoPanels();
+        if (mBubbleHome) {
+            showBubbleHome(firstScreen);
+            mCellPosMapper = new BubbleCellPosMapper(mDp.isVerticalBarLayout(),
+                    mDp.getHotseatProfile().getNumShownIcons());
+        } else {
+            mCellPosMapper = CellPosMapper.DEFAULT;
+        }
+
         mWidgetHolder.startListeningForSharedUpdate();
         mItemInflater = new ItemInflater<>(
                 this,
@@ -226,6 +243,28 @@ public class LauncherPreviewRenderer extends BaseContext
                 bindCompleteUI(state.getValue());
             }
         }
+    }
+
+    /**
+     * Shows the page of the bubble home screen in place of the classic page, as Launcher does:
+     * the whole screen without hotseat.
+     */
+    private void showBubbleHome(CellLayout classicScreen) {
+        BubbleCellLayout bubbles = new BubbleCellLayout(classicScreen.getContext());
+        Rect padding = mDp.getWorkspaceProfile().getCellLayoutPaddingPx();
+        bubbles.setPadding(padding.left, padding.top, padding.right, padding.bottom);
+        InsettableFrameLayout.LayoutParams lp = new InsettableFrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        lp.ignoreInsets = true;
+        ViewGroup parent = (ViewGroup) classicScreen.getParent();
+        int index = parent.indexOfChild(classicScreen);
+        parent.removeViewAt(index);
+        parent.addView(bubbles, index, lp);
+
+        mWorkspaceScreens.clear();
+        mWorkspaceScreens.put(WorkspaceLayoutManager.FIRST_SCREEN_ID, bubbles);
+        mHotseat.setIconsAlpha(0, Hotseat.ALPHA_CHANNEL_BUBBLE_HOME);
+        mHotseat.setQsbAlpha(0, Hotseat.ALPHA_CHANNEL_BUBBLE_HOME);
     }
 
     @Nullable
@@ -332,7 +371,7 @@ public class LauncherPreviewRenderer extends BaseContext
 
     @Override
     public CellPosMapper getCellPosMapper() {
-        return CellPosMapper.DEFAULT;
+        return mCellPosMapper;
     }
 
     private List<CellLayout> getAllLayouts() {
@@ -368,10 +407,16 @@ public class LauncherPreviewRenderer extends BaseContext
         getAllLayouts().forEach(CellLayout::removeAllViews);
 
         // Separate the items that are on the current screen, and the other remaining items.
+        // The bubbles are stored on their own screen.
+        IntSet screenIds = mBubbleHome
+                ? IntSet.wrap(BubbleHome.BUBBLE_SCREEN_ID)
+                : IntSet.wrap(mWorkspaceScreens.keySet());
         itemIdMap.stream()
-                .filter(currentScreenContentFilter(IntSet.wrap(mWorkspaceScreens.keySet())))
+                .filter(currentScreenContentFilter(screenIds))
                 .forEach(this::inflateAndAdd);
-        populateHotseatPredictions(itemIdMap);
+        if (!mBubbleHome) {
+            populateHotseatPredictions(itemIdMap);
+        }
 
         measureAndLayoutRootView();
         dispatchVisibilityAggregated(mRootView, true);

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- Home screen style -->
+    <string name="home_screen_style_title">Home screen style</string>
+    <string name="home_screen_style_classic">Classic</string>
+    <string name="home_screen_style_bubble">Bubble</string>
+    <string name="home_screen_style_classic_summary">The standard Android style, with an app drawer</string>
+    <string name="home_screen_style_bubble_summary">A simple style with every app on the home screen, scrolling vertically</string>
+
+    <!-- Bubble home screen widgets -->
+    <string name="bubble_widgets_title">Widgets</string>
+    <string name="bubble_widgets_summary">Place widgets at the top and bottom of the home screen</string>
+    <string name="bubble_widget_top">Top</string>
+    <string name="bubble_widget_bottom">Bottom</string>
+    <string name="bubble_widget_none">None</string>
+    <string name="bubble_widget_clear">Remove widget</string>
+    <string name="bubble_widget_picker_title">Choose a widget</string>
+    <string name="bubble_widget_picker_empty">No widgets can be placed</string>
+</resources>

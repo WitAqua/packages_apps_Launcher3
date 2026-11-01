@@ -67,6 +67,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.security.InvalidParameterException
+import org.witaqua.launcher3.bubble.BubbleHome
 
 /** Extension of [Cursor] with utility methods for workspace loading. */
 class LoaderCursor
@@ -452,8 +453,9 @@ constructor(
             return true
         }
 
-        val countX = idp.numColumns
-        val countY = idp.numRows
+        val bubbles = item.screenId == BubbleHome.BUBBLE_SCREEN_ID
+        val countX = if (bubbles) BubbleHome.COLUMNS else idp.numColumns
+        val countY = if (bubbles) BubbleHome.MAX_ROWS else idp.numRows
         if (
             item.container == CONTAINER_DESKTOP && item.cellX < 0 ||
                 item.cellY < 0 ||

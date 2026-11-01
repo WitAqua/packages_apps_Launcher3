@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+
+<!-- Home settings of the bubble home screen. The values are the ones of the classic home
+     screen, so that Launcher3 applies them as usual. New apps are always added after the last
+     bubble, as there is no app drawer: the setting to add them to the home screen is not shown. -->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:launcher="http://schemas.android.com/apk/res-auto">
+
+    <Preference
+        android:key="pref_home_screen_style"
+        android:title="@string/home_screen_style_title"
+        android:persistent="false" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:key="pref_workspace_lock"
+        android:persistent="true"
+        android:title="@string/settings_lock_layout_title"
+        android:summaryOn="@string/settings_lock_layout_summary_on"
+        android:summaryOff="@string/settings_lock_layout_summary_off" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:key="pref_sleep_gesture"
+        android:persistent="true"
+        android:title="@string/pref_sleep_gesture_title"
+        android:summary="@string/pref_sleep_gesture_summary" />
+
+    <com.android.launcher3.settings.NotificationDotsPreference
+        android:key="pref_icon_badging"
+        android:title="@string/notification_dots_title"
+        android:persistent="false"
+        android:widgetLayout="@layout/notification_pref_warning" />
+
+    <androidx.preference.PreferenceScreen
+        android:key="pref_bubble_widgets"
+        android:title="@string/bubble_widgets_title"
+        android:summary="@string/bubble_widgets_summary"
+        android:persistent="false">
+
+        <org.witaqua.launcher3.bubble.BubbleWidgetPreference
+            android:key="pref_bubble_widget_top"
+            android:title="@string/bubble_widget_top" />
+
+        <org.witaqua.launcher3.bubble.BubbleWidgetPreference
+            android:key="pref_bubble_widget_bottom"
+            android:title="@string/bubble_widget_bottom" />
+    </androidx.preference.PreferenceScreen>
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="pref_enable_minus_one"
+        android:summary="@string/pref_show_google_now_summary"
+        android:title="@string/title_show_google_app" />
+
+</androidx.preference.PreferenceScreen>

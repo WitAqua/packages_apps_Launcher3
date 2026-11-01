@@ -28,6 +28,7 @@ import androidx.annotation.CallSuper
 import androidx.annotation.Px
 import androidx.compose.ui.platform.ComposeView
 import com.android.launcher3.AbstractFloatingView
+import com.android.launcher3.BubbleTextView
 import com.android.launcher3.DragSource
 import com.android.launcher3.DropTarget.DragObject
 import com.android.launcher3.Flags
@@ -53,6 +54,7 @@ import com.android.launcher3.shortcuts.DeepShortcutView
 import com.android.launcher3.util.ShortcutUtil
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.BaseDragLayer
+import org.witaqua.launcher3.bubble.BubbleHome
 
 /**
  * Base popup container for shortcuts associated with the item {@code originalView}
@@ -300,6 +302,10 @@ open class PopupContainer<T : ActivityContext>(
     override fun getTargetObjectLocation(outPos: Rect) {
         fixedDragLayerPos?.let {
             outPos.set(it)
+            return
+        }
+        if (originalView is BubbleTextView && BubbleHome.getBubbleIconBounds(originalView, outPos)) {
+            // Bubbles are scaled and moved icons: point at the icon as shown.
             return
         }
         popupContainer.getDescendantRectRelativeToSelf(originalView, outPos)

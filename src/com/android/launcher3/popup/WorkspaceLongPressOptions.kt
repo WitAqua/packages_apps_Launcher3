@@ -46,6 +46,7 @@ import com.android.launcher3.testing.TestLogging
 import com.android.launcher3.testing.shared.TestProtocol
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.OptionsPopupView.OptionItem
+import org.witaqua.launcher3.bubble.BubbleHome
 
 /** Class to create default set of long-press options. */
 object WorkspaceLongPressOptions {
@@ -62,7 +63,9 @@ object WorkspaceLongPressOptions {
                 startWallpaperPicker(ac, v)
             }
         )
-        if (BuildConfig.WIDGETS_ENABLED && Utilities.isWorkspaceEditAllowed(ctx)) {
+        // The bubble home screen lists every app and has no widgets.
+        val bubbleHome = BubbleHome.isEnabled(ctx)
+        if (BuildConfig.WIDGETS_ENABLED && Utilities.isWorkspaceEditAllowed(ctx) && !bubbleHome) {
             add(
                 PopupData(
                     R.drawable.ic_widget,
@@ -87,19 +90,21 @@ object WorkspaceLongPressOptions {
             )
         }
 
-        add(
-            PopupData(
-                R.drawable.ic_apps,
-                R.string.all_apps_button_label,
-                SYSTEM_SHORTCUT,
-                LAUNCHER_ALL_APPS_TAP_OR_LONGPRESS,
-            ) { ac, _, _ ->
-                (ac as? Launcher)?.apply {
-                    activityComponent.keyboardStateManager.launchedFromA11y = true
-                    stateManager.goToState(LauncherState.ALL_APPS)
+        if (!bubbleHome) {
+            add(
+                PopupData(
+                    R.drawable.ic_apps,
+                    R.string.all_apps_button_label,
+                    SYSTEM_SHORTCUT,
+                    LAUNCHER_ALL_APPS_TAP_OR_LONGPRESS,
+                ) { ac, _, _ ->
+                    (ac as? Launcher)?.apply {
+                        activityComponent.keyboardStateManager.launchedFromA11y = true
+                        stateManager.goToState(LauncherState.ALL_APPS)
+                    }
                 }
-            }
-        )
+            )
+        }
 
         if (Flags.condoPlanner()) {
             add(

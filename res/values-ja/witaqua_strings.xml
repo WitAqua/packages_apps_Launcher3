@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <string name="home_screen_style_title">ホーム画面のスタイル</string>
+    <string name="home_screen_style_classic">クラシック</string>
+    <string name="home_screen_style_bubble">バブル</string>
+    <string name="home_screen_style_classic_summary">アプリドロワーを使う、Android の標準的なスタイルです</string>
+    <string name="home_screen_style_bubble_summary">すべてのアプリをホーム画面に並べる、縦スクロールのシンプルなスタイルです</string>
+
+    <string name="bubble_widgets_title">ウィジェット</string>
+    <string name="bubble_widgets_summary">ホーム画面の上部・下部にウィジェットを配置します</string>
+    <string name="bubble_widget_top">上部</string>
+    <string name="bubble_widget_bottom">下部</string>
+    <string name="bubble_widget_none">なし</string>
+    <string name="bubble_widget_clear">ウィジェットを解除</string>
+    <string name="bubble_widget_picker_title">ウィジェットを選択</string>
+    <string name="bubble_widget_picker_empty">配置できるウィジェットがありません</string>
+</resources>

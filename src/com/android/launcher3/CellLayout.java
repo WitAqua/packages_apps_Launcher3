@@ -316,10 +316,16 @@ public class CellLayout extends ViewGroup {
             mDragOutlineAnims[i] = anim;
         }
 
-        mShortcutsAndWidgets = new ShortcutAndWidgetContainer(context, mContainerType);
+        mShortcutsAndWidgets = createShortcutsAndWidgetContainer(context, mContainerType);
         mShortcutsAndWidgets.setCellDimensions(mCellWidth, mCellHeight, mCountX, mCountY,
                 mBorderSpace);
         addView(mShortcutsAndWidgets);
+    }
+
+    /** Creates the view holding the items; called from the constructor. */
+    protected ShortcutAndWidgetContainer createShortcutsAndWidgetContainer(Context context,
+            @ContainerType int containerType) {
+        return new ShortcutAndWidgetContainer(context, containerType);
     }
 
     public CellLayoutContainer getCellLayoutContainer() {
@@ -654,11 +660,21 @@ public class CellLayout extends ViewGroup {
 
                 canvas.save();
                 canvas.translate(getMarginForGivenCellParams(params), 0);
-                canvas.drawRoundRect(mVisualizeGridRect, mGridVisualizationRoundingRadius,
-                        mGridVisualizationRoundingRadius, mVisualizeGridPaint);
+                drawDropLocation(canvas, params, mVisualizeGridRect, mVisualizeGridPaint);
                 canvas.restore();
             }
         }
+    }
+
+    /**
+     * Draws the outline showing where a dragged item will land.
+     *
+     * @param bounds the bounds of the outline in the cells of {@code params}
+     */
+    protected void drawDropLocation(Canvas canvas, CellLayoutLayoutParams params, RectF bounds,
+            Paint paint) {
+        canvas.drawRoundRect(bounds, mGridVisualizationRoundingRadius,
+                mGridVisualizationRoundingRadius, paint);
     }
 
     protected float getMarginForGivenCellParams(CellLayoutLayoutParams params) {

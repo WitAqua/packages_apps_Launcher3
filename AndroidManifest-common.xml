@@ -186,6 +186,13 @@
             android:value="true" />
 
         <activity
+            android:name="org.witaqua.launcher3.bubble.HomeScreenStyleActivity"
+            android:label="@string/home_screen_style_title"
+            android:theme="@style/HomeSettings.Theme"
+            android:exported="false"
+            android:autoRemoveFromRecents="true" />
+
+        <activity
             android:name="com.android.launcher3.lineage.trust.TrustAppsActivity"
             android:label="@string/trust_apps_manager_name"
             android:theme="@android:style/Theme.DeviceDefault.Settings"

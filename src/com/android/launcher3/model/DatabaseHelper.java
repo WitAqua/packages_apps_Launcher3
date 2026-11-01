@@ -53,6 +53,9 @@ import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.widget.LauncherWidgetHolder;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+import org.witaqua.launcher3.bubble.BubbleWidgets;
+
 import java.io.File;
 import java.net.URISyntaxException;
 import java.util.Arrays;
@@ -322,6 +325,8 @@ public class DatabaseHelper extends SQLiteOpenHelper implements
             final IntSet validWidgets = IntSet.wrap(LauncherDbUtils.queryIntArray(false, db,
                     Favorites.TABLE_NAME, Favorites.APPWIDGET_ID,
                     "itemType=" + Favorites.ITEM_TYPE_APPWIDGET, null, null));
+            // The widgets of the bubble home screen are not workspace items.
+            validWidgets.addAll(BubbleWidgets.getWidgetIds(mContext));
             boolean isAnyWidgetRemoved = false;
             for (int widgetId : allWidgets) {
                 if (!validWidgets.contains(widgetId)) {
@@ -486,10 +491,11 @@ public class DatabaseHelper extends SQLiteOpenHelper implements
      * existing screen IDs
      */
     public int getNewScreenId() {
+        // The screen of the bubble home screen is not a page of the classic one.
         return getMaxId(getWritableDatabase(),
-                "SELECT MAX(%1$s) FROM %2$s WHERE %3$s = %4$d AND %1$s >= 0",
+                "SELECT MAX(%1$s) FROM %2$s WHERE %3$s = %4$d AND %1$s >= 0 AND %1$s != %5$d",
                 Favorites.SCREEN, Favorites.TABLE_NAME, Favorites.CONTAINER,
-                Favorites.CONTAINER_DESKTOP) + 1;
+                Favorites.CONTAINER_DESKTOP, BubbleHome.BUBBLE_SCREEN_ID) + 1;
     }
 
     public int loadFavorites(SQLiteDatabase db, AutoInstallsLayout loader) {

@@ -38,6 +38,8 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 /**
  * A utility class to generate preview bitmap for dragging.
  */
@@ -76,6 +78,7 @@ public class DragPreviewProvider {
                 dv.getSourceVisualDragBounds(mTempRect);
                 destCanvas.translate(blurSizeOutline / 2 - mTempRect.left,
                         blurSizeOutline / 2 - mTempRect.top);
+                BubbleHome.clipDragPreview(mView, destCanvas, mTempRect);
                 mView.draw(destCanvas);
             }
         }
@@ -102,6 +105,12 @@ public class DragPreviewProvider {
         } else {
             width = mView.getWidth();
             height = mView.getHeight();
+        }
+        if (BubbleHome.isBubble(mView)) {
+            // Bubbles are scaled icons: the preview is drawn at the size they are shown, as the
+            // drag view ends up at the size of its preview.
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
         }
 
         if (mView instanceof BubbleTextView btv
@@ -152,6 +161,11 @@ public class DragPreviewProvider {
     }
 
     public float getScaleAndPosition(Drawable preview, int[] outPos) {
+        float bubbleScale = BubbleHome.getDragPreviewScaleAndPosition(mView,
+                preview.getIntrinsicWidth(), preview.getIntrinsicHeight(), outPos);
+        if (bubbleScale > 0) {
+            return bubbleScale;
+        }
         float scale = ActivityContext.lookupContext(mView.getContext())
                 .getDragLayer().getLocationInDragLayer(mView, outPos);
         if (mView instanceof LauncherAppWidgetHostView) {

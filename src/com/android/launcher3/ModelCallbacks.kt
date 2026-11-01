@@ -55,6 +55,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Consumer
 import java.util.function.Predicate
+import org.witaqua.launcher3.bubble.BubbleHome
 
 class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
 
@@ -243,6 +244,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         Preconditions.assertUIThread()
         val hadWorkApps = launcher.appsView.shouldShowTabs()
         launcher.activityComponent.appsStore.setApps(apps, flags, packageUserKeytoUidMap)
+        BubbleHome.addMissingApps(launcher)
         PopupContainer.dismissInvalidPopup(launcher)
         if (
             hadWorkApps != launcher.appsView.shouldShowTabs() &&
@@ -426,6 +428,10 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         }
         orderedScreenIds
             .filter { screenId -> screenId != FIRST_SCREEN_ID }
+            // The bubble home screen is only the first page, the classic one never shows it.
+            .filter { screenId ->
+                !launcher.isBubbleHome && screenId != BubbleHome.BUBBLE_SCREEN_ID
+            }
             .forEach { screenId ->
                 launcher.workspace.insertNewWorkspaceScreenBeforeEmptyScreen(screenId)
             }

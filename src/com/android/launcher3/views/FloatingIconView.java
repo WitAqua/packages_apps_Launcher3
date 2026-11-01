@@ -62,6 +62,8 @@ import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.util.AsyncView;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.util.function.Supplier;
 
 /**
@@ -275,6 +277,18 @@ public class FloatingIconView extends FrameLayout implements
             ((FolderIcon) v).getPreviewBounds(outViewBounds);
         } else {
             outViewBounds.set(0, 0, v.getWidth(), v.getHeight());
+        }
+
+        if (ignoreTransform && BubbleHome.isBubble(v)) {
+            // Bubbles are scaled and moved items: their own transform is where they are shown,
+            // only the transforms of their parents are ignored.
+            RectF bounds = new RectF(outViewBounds);
+            v.getMatrix().mapRect(bounds);
+            Rect shownBounds = new Rect();
+            bounds.round(shownBounds);
+            Utilities.getBoundsForViewInDragLayer(launcher.getDragLayer(), v, shownBounds,
+                    true /* ignoreTransform */, null /** recycle */, outRect);
+            return;
         }
 
         Utilities.getBoundsForViewInDragLayer(launcher.getDragLayer(), v, outViewBounds,

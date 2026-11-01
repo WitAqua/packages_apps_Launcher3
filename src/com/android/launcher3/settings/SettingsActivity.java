@@ -67,6 +67,10 @@ import com.android.launcher3.util.SettingsCache;
 import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 import com.android.settingslib.widget.SettingsThemeHelper;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+import org.witaqua.launcher3.bubble.BubbleSettingsFragment;
+import org.witaqua.launcher3.bubble.HomeScreenStyleActivity;
+
 /**
  * Settings activity for Launcher.
  */
@@ -130,11 +134,41 @@ public class SettingsActivity extends FragmentActivity
 
             final FragmentManager fm = getSupportFragmentManager();
             final Fragment f = fm.getFragmentFactory().instantiate(getClassLoader(),
-                    getString(R.string.settings_fragment_name));
+                    getSettingsFragmentName());
             f.setArguments(args);
             // Display the fragment as the main content.
             fm.beginTransaction().replace(R.id.content_frame, f).commit();
         }
+    }
+
+    /** The bubble home screen has its own settings. */
+    private String getSettingsFragmentName() {
+        return BubbleHome.isEnabled(this)
+                ? BubbleSettingsFragment.class.getName()
+                : getString(R.string.settings_fragment_name);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Each home screen style has its own settings: show the ones of the style chosen in its
+        // screen.
+        if ((getSupportFragmentManager().findFragmentById(R.id.content_frame)
+                instanceof BubbleSettingsFragment) != BubbleHome.isEnabled(this)) {
+            showSettingsOfHomeScreenStyle();
+        }
+    }
+
+    /** Replaces the settings shown by the ones of the selected home screen style. */
+    private void showSettingsOfHomeScreenStyle() {
+        final FragmentManager fm = getSupportFragmentManager();
+        if (fm.isStateSaved()) {
+            return;
+        }
+        final Fragment f = fm.getFragmentFactory().instantiate(getClassLoader(),
+                getSettingsFragmentName());
+        f.setArguments(new Bundle());
+        fm.beginTransaction().replace(R.id.content_frame, f).commit();
     }
 
     private boolean startPreference(String fragment, Bundle args, String key) {
@@ -165,7 +199,17 @@ public class SettingsActivity extends FragmentActivity
     public boolean onPreferenceStartScreen(PreferenceFragmentCompat caller, PreferenceScreen pref) {
         Bundle args = new Bundle();
         args.putString(ARG_PREFERENCE_ROOT, pref.getKey());
-        return startPreference(getString(R.string.settings_fragment_name), args, pref.getKey());
+        return startPreference(getSettingsFragmentName(), args, pref.getKey());
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        // The widgets of the bubble home screen are bound and configured from the activity.
+        if (getSupportFragmentManager().findFragmentById(R.id.content_frame)
+                instanceof BubbleSettingsFragment fragment) {
+            fragment.onWidgetActivityResult(requestCode, resultCode);
+        }
     }
 
     @Override
@@ -232,7 +276,7 @@ public class SettingsActivity extends FragmentActivity
             }
 
             getPreferenceManager().setSharedPreferencesName(LauncherFiles.SHARED_PREFERENCES_KEY);
-            setPreferencesFromResource(R.xml.launcher_preferences, rootKey);
+            setPreferencesFromResource(getPreferencesResId(), rootKey);
 
             PreferenceScreen screen = getPreferenceScreen();
             for (int i = screen.getPreferenceCount() - 1; i >= 0; i--) {
@@ -261,6 +305,11 @@ public class SettingsActivity extends FragmentActivity
             if (getActivity() != null && !TextUtils.isEmpty(getPreferenceScreen().getTitle())) {
                 getActivity().setTitle(getPreferenceScreen().getTitle());
             }
+        }
+
+        /** Returns the preferences shown by this fragment. */
+        protected int getPreferencesResId() {
+            return R.xml.launcher_preferences;
         }
 
         private boolean isKeyInPreferenceGroup(String targetKey, PreferenceGroup parent) {
@@ -329,6 +378,14 @@ public class SettingsActivity extends FragmentActivity
             LauncherApps launcherApps = getContext().getSystemService(LauncherApps.class);
             LauncherDisplayInfo info = DisplayController.INSTANCE.get(getContext()).getInfo();
             switch (preference.getKey()) {
+                case BubbleHome.KEY_HOME_SCREEN_STYLE:
+                    // The style is chosen in its own screen, with an illustration of each style.
+                    preference.setSummary(BubbleHome.isEnabled(getContext())
+                            ? R.string.home_screen_style_bubble
+                            : R.string.home_screen_style_classic);
+                    preference.setIntent(
+                            new Intent(getContext(), HomeScreenStyleActivity.class));
+                    return true;
                 case NOTIFICATION_DOTS_PREFERENCE_KEY:
                     return BuildConfig.NOTIFICATION_DOTS_ENABLED;
                 case DEVELOPER_OPTIONS_KEY:

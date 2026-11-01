@@ -41,6 +41,8 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.util.ApplicationInfoWrapper;
 import com.android.launcher3.util.IntSet;
 
+import org.witaqua.launcher3.bubble.BubbleHome;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
@@ -116,9 +118,15 @@ public class AddWorkspaceItemsTask implements ModelUpdateTask {
                     continue;
                 }
 
-                // Find appropriate space for the item.
-                WorkspaceItemCoordinates coords = mItemSpaceFinder.findSpaceForItem(addedItemsFinal,
-                        item.spanX, item.spanY, excludedScreens);
+                // Find appropriate space for the item: the bubble home screen adds it after its
+                // last bubble.
+                WorkspaceItemCoordinates coords = BubbleHome.isEnabled(context)
+                        ? BubbleHome.findSpaceForNewItem(dataModel, addedItemsFinal, item)
+                        : null;
+                if (coords == null) {
+                    coords = mItemSpaceFinder.findSpaceForItem(addedItemsFinal,
+                            item.spanX, item.spanY, excludedScreens);
+                }
 
                 // Save the WorkspaceItemInfo for binding in the workspace
                 coords.applyTo(item);
