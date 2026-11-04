@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) WitAqua
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+
+    <!-- Folder appearance -->
+    <string name="folder_fullscreen_blur_title">フォルダを全画面ブラーで開く</string>
+    <string name="folder_fullscreen_blur_summary">XiaomiやSamsungのように、フォルダを開いたときに背景をぼかして内容を画面中央に表示します</string>
+
+</resources>

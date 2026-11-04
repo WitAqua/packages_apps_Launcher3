@@ -37,10 +37,13 @@ import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFram
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.appwidget.AppWidgetHostView;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -61,9 +64,12 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewDebug;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.AnimationUtils;
+import android.view.animation.Interpolator;
+import android.view.animation.OvershootInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -77,6 +83,7 @@ import androidx.core.content.res.ResourcesCompat;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Alarm;
 import com.android.launcher3.BoxSelectionHelper;
+import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.CellLayout;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DragSource;
@@ -84,6 +91,7 @@ import com.android.launcher3.DropTarget;
 import com.android.launcher3.ExtendedEditText;
 import com.android.launcher3.Flags;
 import com.android.launcher3.Launcher;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.OnAlarmListener;
 import com.android.launcher3.R;
 import com.android.launcher3.ShortcutAndWidgetContainer;
@@ -125,7 +133,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
@@ -176,6 +186,10 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
      * Fraction of icon width which behave as scroll region.
      */
     private static final float ICON_OVERSCROLL_WIDTH_FACTOR = 0.45f;
+    // WitAqua: starting scale of the fullscreen folder bloom animation.
+    private static final float FULLSCREEN_FOLDER_INITIAL_SCALE = 0.85f;
+    private static final long FULLSCREEN_FOLDER_OPEN_DURATION_MS = 260;
+    private static final float FULLSCREEN_FOLDER_OPEN_OVERSHOOT_TENSION = 0.8f;
 
     private static final int FOLDER_NAME_ANIMATION_DURATION = 633;
     private static final int FOLDER_COLOR_ANIMATION_DURATION = 200;
@@ -274,6 +288,42 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private final @NonNull GradientDrawable mBackground;
     private final BoxSelectionHelper mBoxSelectionHelper;
     private final BlurBackgroundHelper mBlurBackgroundHelper;
+
+    // WitAqua: fullscreen blur backdrop shown behind the folder while the
+    // fullscreen folder mode (pref_folder_fullscreen_blur) is enabled.
+    private FolderFullscreenBlurView mFullscreenBlurView;
+
+    // WitAqua: fullscreen folder mode state for the currently open folder,
+    // captured in animateOpen() so per-frame drawing does not re-read the pref.
+    private boolean mFullscreenFolderMode;
+
+    // WitAqua: folder title shown large above the folder while the
+    // fullscreen folder mode is enabled (the in-folder name field is
+    // hidden in this mode).
+    private TextView mFullscreenTitleView;
+
+    // WitAqua: animator driving the fullscreen backdrop blur progress, timed
+    // to match the folder's own open/close animation.
+    private ValueAnimator mFullscreenBlurAnimator;
+    private float mFullscreenBlurProgress;
+    private boolean mFullscreenBlurOpening;
+
+    // WitAqua: original text color of the folder name field, saved while it
+    // is shown (in white) for name editing in fullscreen folder mode.
+    private int mFolderNameColorBeforeEdit;
+    private boolean mFolderNameColorSaved;
+
+    // WitAqua: state for temporarily moving the folder name field from the
+    // folder footer to the fullscreen title position while it is edited.
+    private boolean mFolderNameMovedForEdit;
+    private ViewGroup.LayoutParams mFolderNameParentLp;
+    private View mFolderNameSpacer;
+    private float mFolderNameTextSizePx;
+    private int mFolderNameGravity;
+
+    // WitAqua: original label colors of the folder contents, captured while
+    // forcing them white in fullscreen folder mode.
+    private final Map<TextView, Integer> mLabelColorOverrides = new HashMap<>();
 
     private CustomEventsTouchHandler mCustomEventsTouchHandler;
 
@@ -514,6 +564,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
         Selection.setSelection(mFolderName.getText(), 0, 0);
         mIsEditingName = false;
+        if (mFullscreenFolderMode) {
+            finishFullscreenNameEditing();
+        }
         return true;
     }
 
@@ -755,7 +808,23 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         Folder openFolder = getOpen(mActivityContext);
         closeOpenFolder(openFolder);
 
-        if (blurOnMoreSurfaces()) {
+        mFullscreenFolderMode = isFullscreenFolderMode();
+        // WitAqua: the fullscreen bloom animates this view's own scale and
+        // alpha and leaves them at 0.85 / 0 when it closes. The stock spring
+        // animation never touches the folder's own scale/alpha (in stock
+        // they are always 1), so a stock open following a fullscreen close
+        // would run on an invisible, shrunk folder. Restore the canonical
+        // values before either animation system runs; the bloom's opening
+        // set re-applies its own start values when it is built below.
+        setScaleX(1f);
+        setScaleY(1f);
+        setAlpha(1f);
+        if (mFullscreenFolderMode) {
+            // The fullscreen backdrop provides the blur in this mode. The
+            // folder-local blur is skipped entirely: it would double-draw, and
+            // its cross-window part is misplaced for a centered folder.
+            mBlurBackgroundHelper.prepareFullscreenFolderBlur(this);
+        } else if (blurOnMoreSurfaces()) {
             mBlurBackgroundHelper.prepareToOpenFolder(this);
         }
 
@@ -770,6 +839,10 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         // Just verify that the folder hasn't already been added to the DragLayer.
         // There was a one-off crash where the folder had a parent already.
         if (getParent() == null) {
+            if (mFullscreenFolderMode) {
+                showFullscreenBlurView(dragLayer);
+                applyFullscreenFolderStyle();
+            }
             dragLayer.addView(this);
             mActivityContext.getDragController().addDropTarget(this);
         } else {
@@ -797,8 +870,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         Log.d("b/383526431", "animateOpen: content child count after cancelling"
                 + " animation: " + mContent.getTotalChildCount());
 
-        AnimatorSet animatorSet = getFolderAnimationManager()
-                .createAnimatorSet(/* isOpening */ true);
+        AnimatorSet animatorSet = mFullscreenFolderMode
+                ? createFullscreenBloomAnimatorSet(/* isOpening */ true)
+                : getFolderAnimationManager().createAnimatorSet(/* isOpening */ true);
 
         animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
@@ -870,6 +944,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         animatorSet.setCurrentPlayTime(Math.min(
                 getSingleFrameMs(getContext()), animatorSet.getTotalDuration()));
         animatorSet.start();
+        if (mFullscreenFolderMode) {
+            animateFullscreenBlur(true, animatorSet.getTotalDuration());
+        }
 
 
         // Make sure the folder picks up the last drag move even if the finger doesn't move.
@@ -973,8 +1050,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mContent.snapToPageImmediately(mContent.getDestinationPage());
 
         cancelRunningAnimations();
-        AnimatorSet animatorSet = getFolderAnimationManager()
-                .createAnimatorSet(/* isOpening */ false);
+        AnimatorSet animatorSet = mFullscreenFolderMode
+                ? createFullscreenBloomAnimatorSet(/* isOpening */ false)
+                : getFolderAnimationManager().createAnimatorSet(/* isOpening */ false);
 
         animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
@@ -1000,6 +1078,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             }
         });
         addAnimationStartListeners(animatorSet);
+        if (mFullscreenBlurView != null) {
+            animateFullscreenBlur(false, animatorSet.getTotalDuration());
+        }
         animatorSet.start();
     }
 
@@ -1018,6 +1099,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
     private void closeComplete(boolean wasAnimated) {
         mIsOpen = false;
         mBlurBackgroundHelper.folderCloseComplete();
+        removeFullscreenBlurView();
+        restoreFullscreenFolderStyle();
 
         // TODO: Clear all active animations.
         BaseDragLayer parent = (BaseDragLayer) getParent();
@@ -1304,11 +1387,495 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         return mState != STATE_ANIMATING;
     }
 
+    /**
+     * WitAqua: whether the fullscreen folder mode is enabled. When enabled, an open
+     * folder is centered on screen over a fullscreen blurred backdrop (Xiaomi /
+     * Samsung style) instead of expanding in place over its icon.
+     */
+    public boolean isFullscreenFolderMode() {
+        return LauncherPrefs.get(getContext()).get(LauncherPrefs.FOLDER_FULLSCREEN_BLUR);
+    }
+
+    private void showFullscreenBlurView(BaseDragLayer dragLayer) {
+        removeFullscreenBlurView();
+        mFullscreenBlurView = new FolderFullscreenBlurView(getContext(), mBlurBackgroundHelper);
+        // A custom position is used so the backdrop covers the whole drag
+        // layer including the status bar and navigation bar areas: regular
+        // children are laid out inside the drag layer's inset content area,
+        // which would leave those strips unblurred and would misalign the
+        // workspace snapshot drawn by the backdrop.
+        BaseDragLayer.LayoutParams lp = new BaseDragLayer.LayoutParams(
+                dragLayer.getWidth(), dragLayer.getHeight());
+        lp.customPosition = true;
+        lp.x = 0;
+        lp.y = 0;
+        dragLayer.addView(mFullscreenBlurView, lp);
+        showFullscreenTitleView(dragLayer);
+        applyFullscreenBlurProgress(0f);
+    }
+
+    private void removeFullscreenBlurView() {
+        if (mFullscreenBlurAnimator != null) {
+            mFullscreenBlurAnimator.cancel();
+            mFullscreenBlurAnimator = null;
+        }
+        if (mFullscreenBlurView != null) {
+            mFullscreenBlurView.animate().cancel();
+            if (mFullscreenBlurView.getParent() instanceof BaseDragLayer) {
+                ((BaseDragLayer) mFullscreenBlurView.getParent())
+                        .removeView(mFullscreenBlurView);
+            }
+            mFullscreenBlurView = null;
+        }
+        removeFullscreenTitleView();
+    }
+
+    /**
+     * WitAqua: shows the folder name in large white text at the top-left of
+     * the screen, Xiaomi style. The in-folder name field is hidden in this
+     * mode (see {@link #applyFullscreenFolderStyle()}).
+     */
+    private void showFullscreenTitleView(BaseDragLayer dragLayer) {
+        removeFullscreenTitleView();
+        CharSequence title = null;
+        if (mFolderName != null) {
+            title = mFolderName.getText();
+            if (TextUtils.isEmpty(title)) {
+                title = mFolderName.getHint();
+            }
+        }
+        if (TextUtils.isEmpty(title) && mInfo != null) {
+            title = mInfo.title;
+        }
+        if (TextUtils.isEmpty(title)) {
+            return;
+        }
+        TextView titleView = new TextView(getContext());
+        titleView.setText(title);
+        titleView.setTextColor(Color.WHITE);
+        titleView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30);
+        titleView.setTypeface(Typeface.DEFAULT_BOLD);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(TextUtils.TruncateAt.END);
+        // Note: the drag layer lays custom-position children out with the raw
+        // layout params, so the height must be given explicitly (WRAP_CONTENT
+        // would be used as-is and collapse the view).
+        int titleHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 46,
+                getResources().getDisplayMetrics());
+        int gap = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12,
+                getResources().getDisplayMetrics());
+        // Place the title directly above the folder, aligned with the left
+        // edge of the folder's content. centerAboutIcon() has already run,
+        // so this folder's layout params hold its final position and size.
+        BaseDragLayer.LayoutParams folderLp = (BaseDragLayer.LayoutParams) getLayoutParams();
+        int titleLeft = folderLp.x + (mContent != null ? mContent.getPaddingLeft() : 0);
+        int titleWidth = Math.max(0, folderLp.x + folderLp.width - titleLeft);
+        int titleTop = Math.max(gap, folderLp.y - gap - titleHeight);
+        BaseDragLayer.LayoutParams lp = new BaseDragLayer.LayoutParams(
+                titleWidth, titleHeight);
+        lp.customPosition = true;
+        lp.x = titleLeft;
+        lp.y = titleTop;
+        titleView.setAlpha(0f);
+        // Tapping the title starts renaming the folder, like tapping the
+        // in-folder name field (hidden in this mode) does in stock mode.
+        titleView.setOnClickListener(v -> startFullscreenNameEditing());
+        dragLayer.addView(titleView, lp);
+        mFullscreenTitleView = titleView;
+    }
+
+    private void removeFullscreenTitleView() {
+        if (mFullscreenTitleView != null) {
+            mFullscreenTitleView.animate().cancel();
+            if (mFullscreenTitleView.getParent() instanceof BaseDragLayer) {
+                ((BaseDragLayer) mFullscreenTitleView.getParent())
+                        .removeView(mFullscreenTitleView);
+            }
+            mFullscreenTitleView = null;
+        }
+    }
+
+    /**
+     * WitAqua: starts renaming the folder from the fullscreen title. The
+     * stock name field is shown (in white, like the other labels in this
+     * mode) and focused, which runs the usual editing flow: focus triggers
+     * startEditingFolderName(), and the new name is committed in onBackKey().
+     */
+    private void startFullscreenNameEditing() {
+        if (mFolderName == null || mIsEditingName) {
+            return;
+        }
+        if (mFullscreenTitleView != null) {
+            mFullscreenTitleView.setVisibility(View.INVISIBLE);
+        }
+        mFolderNameColorBeforeEdit = mFolderName.getCurrentTextColor();
+        mFolderNameColorSaved = true;
+        mFolderName.setTextColor(Color.WHITE);
+        moveFolderNameToTitle();
+        mFolderName.setVisibility(View.VISIBLE);
+        mFolderName.requestFocus();
+        mFolderName.showKeyboard();
+    }
+
+    /**
+     * WitAqua: ends a rename started from the fullscreen title: hides the
+     * stock name field again and refreshes the title with the new name.
+     * Called from onBackKey() after the new title has been committed.
+     */
+    private void finishFullscreenNameEditing() {
+        if (mFolderName != null) {
+            restoreFolderNamePlacement();
+            restoreFolderNameColor();
+            mFolderName.setVisibility(View.INVISIBLE);
+        }
+        if (mFullscreenTitleView != null) {
+            CharSequence title = null;
+            if (mFolderName != null) {
+                title = mFolderName.getText();
+                if (TextUtils.isEmpty(title)) {
+                    title = mFolderName.getHint();
+                }
+            }
+            if (TextUtils.isEmpty(title) && mInfo != null) {
+                title = mInfo.title;
+            }
+            if (TextUtils.isEmpty(title)) {
+                mFullscreenTitleView.setVisibility(View.GONE);
+            } else {
+                mFullscreenTitleView.setText(title);
+                mFullscreenTitleView.setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
+    private void restoreFolderNameColor() {
+        if (mFolderNameColorSaved && mFolderName != null) {
+            mFolderName.setTextColor(mFolderNameColorBeforeEdit);
+            mFolderNameColorSaved = false;
+        }
+    }
+
+    /**
+     * WitAqua: moves the folder name field from the folder footer to the
+     * fullscreen title's position in the drag layer, so editing happens at
+     * the top where the title is shown instead of below the icons. A spacer
+     * of the same height keeps the footer (and thus the folder layout) from
+     * shifting while the field is away. All stock editing behavior (focus,
+     * suggestions, commit in onBackKey()) works unchanged, as it is bound
+     * to the field itself, not to its parent.
+     */
+    private void moveFolderNameToTitle() {
+        if (mFullscreenTitleView == null
+                || !(mFolderName.getParent() instanceof ViewGroup)
+                || !(mFullscreenTitleView.getLayoutParams()
+                        instanceof BaseDragLayer.LayoutParams)) {
+            return;
+        }
+        ViewGroup footer = (ViewGroup) mFolderName.getParent();
+        BaseDragLayer.LayoutParams titleLp =
+                (BaseDragLayer.LayoutParams) mFullscreenTitleView.getLayoutParams();
+        mFolderNameParentLp = mFolderName.getLayoutParams();
+        mFolderNameTextSizePx = mFolderName.getTextSize();
+        mFolderNameGravity = mFolderName.getGravity();
+        View spacer = new View(getContext());
+        spacer.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, mFolderName.getHeight()));
+        int index = footer.indexOfChild(mFolderName);
+        footer.addView(spacer, index);
+        footer.removeView(mFolderName);
+        mFolderNameSpacer = spacer;
+        BaseDragLayer.LayoutParams lp = new BaseDragLayer.LayoutParams(
+                titleLp.width, titleLp.height);
+        lp.customPosition = true;
+        lp.x = titleLp.x;
+        lp.y = titleLp.y;
+        mActivityContext.getDragLayer().addView(mFolderName, lp);
+        mFolderName.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30);
+        mFolderName.setTypeface(Typeface.DEFAULT_BOLD);
+        mFolderName.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        mFolderNameMovedForEdit = true;
+    }
+
+    /** WitAqua: returns the name field to the folder footer after editing. */
+    private void restoreFolderNamePlacement() {
+        if (!mFolderNameMovedForEdit || mFolderName == null) {
+            return;
+        }
+        mFolderNameMovedForEdit = false;
+        if (mFolderName.getParent() instanceof ViewGroup) {
+            ((ViewGroup) mFolderName.getParent()).removeView(mFolderName);
+        }
+        if (mFolderNameSpacer != null
+                && mFolderNameSpacer.getParent() instanceof ViewGroup) {
+            ViewGroup footer = (ViewGroup) mFolderNameSpacer.getParent();
+            int index = footer.indexOfChild(mFolderNameSpacer);
+            footer.removeView(mFolderNameSpacer);
+            footer.addView(mFolderName, index, mFolderNameParentLp);
+        }
+        mFolderNameSpacer = null;
+        mFolderNameParentLp = null;
+        mFolderName.setTextSize(TypedValue.COMPLEX_UNIT_PX, mFolderNameTextSizePx);
+        mFolderName.setTypeface(Typeface.create("google-sans-flex", Typeface.NORMAL));
+        mFolderName.setGravity(mFolderNameGravity);
+    }
+
+    /**
+     * WitAqua: in fullscreen folder mode the folder is already laid out at
+     * its final (centered) position, so the stock choreography — flying
+     * in from the folder icon while a clip reveal expands from it, with
+     * the labels and the non-preview items fading in on their own slower
+     * tracks — reads as a diagonal stream of half-labeled icons. Use an
+     * in-place bloom instead: the whole folder scales from 0.85 about its
+     * center while fading in, and reverses on close. On close the current
+     * values are the starting point, so reversing a half-finished open
+     * does not snap.
+     */
+    private AnimatorSet createFullscreenBloomAnimatorSet(boolean isOpening) {
+        // The stock animation sets the folder background color as part of
+        // its setup (transparent in fullscreen mode, via its color
+        // animator); this set has no color animator, so set it directly.
+        // The stock paths set the color again on their next run, so
+        // leaving it transparent after a fullscreen close is harmless.
+        mBackground.mutate();
+        mBackground.setColor(Color.TRANSPARENT);
+        AnimatorSet set = new AnimatorSet();
+        Interpolator standardInterpolator = AnimationUtils.loadInterpolator(
+                getContext(), R.interpolator.standard_interpolator);
+        BaseDragLayer.LayoutParams lp = (BaseDragLayer.LayoutParams) getLayoutParams();
+        setPivotX(lp.width / 2f);
+        setPivotY(lp.height / 2f);
+        List<Animator> animators = new ArrayList<>();
+        if (isOpening) {
+            // WitAqua: on open, everything is driven as one motion (the
+            // backdrop uses this same progress; see
+            // applyFullscreenBlurProgress): the icons become solid early,
+            // over the first part of the animation, so they do not drift
+            // over the still-sharp background as faint ghosts, and the
+            // scale settles with a slight overshoot instead of stopping
+            // dead at 1.0.
+            long duration = FULLSCREEN_FOLDER_OPEN_DURATION_MS;
+            Interpolator overshoot = new OvershootInterpolator(
+                    FULLSCREEN_FOLDER_OPEN_OVERSHOOT_TENSION);
+            setScaleX(FULLSCREEN_FOLDER_INITIAL_SCALE);
+            setScaleY(FULLSCREEN_FOLDER_INITIAL_SCALE);
+            setAlpha(0f);
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(this, View.SCALE_X,
+                    FULLSCREEN_FOLDER_INITIAL_SCALE, 1f);
+            scaleX.setDuration(duration);
+            scaleX.setInterpolator(overshoot);
+            animators.add(scaleX);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(this, View.SCALE_Y,
+                    FULLSCREEN_FOLDER_INITIAL_SCALE, 1f);
+            scaleY.setDuration(duration);
+            scaleY.setInterpolator(overshoot);
+            animators.add(scaleY);
+            ObjectAnimator alpha = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f);
+            alpha.setDuration(duration * 3 / 5);
+            alpha.setInterpolator(standardInterpolator);
+            animators.add(alpha);
+        } else {
+            long duration = getResources().getInteger(
+                    R.integer.config_materialFolderExpandDuration);
+            animators.add(ObjectAnimator.ofFloat(this, View.SCALE_X,
+                    getScaleX(), FULLSCREEN_FOLDER_INITIAL_SCALE));
+            animators.add(ObjectAnimator.ofFloat(this, View.SCALE_Y,
+                    getScaleY(), FULLSCREEN_FOLDER_INITIAL_SCALE));
+            animators.add(ObjectAnimator.ofFloat(this, View.ALPHA, getAlpha(), 0f));
+            for (Animator animator : animators) {
+                animator.setDuration(duration);
+                animator.setInterpolator(standardInterpolator);
+            }
+        }
+        set.playTogether(animators);
+        return set;
+    }
+
+    /**
+     * WitAqua: animates the fullscreen backdrop blur between its current
+     * progress and fully blurred (opening) or no blur (closing), using the
+     * folder animation's own duration and interpolator so the backdrop and
+     * the folder move together instead of fading on separate timings.
+     */
+    private void animateFullscreenBlur(boolean opening, long folderAnimDuration) {
+        if (mFullscreenBlurAnimator != null) {
+            mFullscreenBlurAnimator.cancel();
+            mFullscreenBlurAnimator = null;
+        }
+        mFullscreenBlurOpening = opening;
+        float from = mFullscreenBlurProgress;
+        float to = opening ? 1f : 0f;
+        if (from == to) {
+            applyFullscreenBlurProgress(to);
+            return;
+        }
+        long fullDuration = folderAnimDuration > 0 && folderAnimDuration <= 1000
+                ? folderAnimDuration
+                : getResources().getInteger(R.integer.config_materialFolderExpandDuration);
+        ValueAnimator animator = ValueAnimator.ofFloat(from, to);
+        animator.setDuration(Math.max(1, (long) (fullDuration * Math.abs(to - from))));
+        animator.setInterpolator(AnimationUtils.loadInterpolator(
+                getContext(), R.interpolator.standard_interpolator));
+        animator.addUpdateListener(animation ->
+                applyFullscreenBlurProgress((float) animation.getAnimatedValue()));
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (mFullscreenBlurAnimator == animation) {
+                    mFullscreenBlurAnimator = null;
+                }
+            }
+        });
+        mFullscreenBlurAnimator = animator;
+        animator.start();
+    }
+
+    private void applyFullscreenBlurProgress(float progress) {
+        mFullscreenBlurProgress = progress;
+        // When opening, the backdrop tracks the folder's own progress and
+        // completes together with the icons' fade-in (progress 0.85, see
+        // the title note below), tapered by a smoothstep so its last
+        // change fades out instead of stopping dead. An earlier ease-out
+        // remap made the backdrop run far ahead of the folder (the
+        // background finished blurring while the icons were still faint
+        // ghosts), which read as two separate events; a plain 1:1 mapping
+        // instead made the cross-fade's last step land at (or a frame
+        // after) the moment the folder itself settled, which read as a
+        // small jolt of the background at the completion moment. When
+        // closing, a smoothstep hold keeps the blur at full strength
+        // while the folder shrinks back into its icon and only releases
+        // it in the last part of the animation, so the background settles
+        // together with the folder instead of snapping sharp halfway
+        // through. The helper turns the value into a cross-fade between
+        // the sharp and the fully blurred backdrop at a fixed blur
+        // radius, so no per-frame blur recomputation drops frames.
+        float eased;
+        if (mFullscreenBlurOpening) {
+            float t = Math.min(1f, progress / 0.85f);
+            eased = t * t * (3f - 2f * t);
+        } else {
+            float s = Math.min(1f, progress / 0.35f);
+            eased = s * s * (3f - 2f * s);
+        }
+        mBlurBackgroundHelper.setFullscreenBlurProgress(eased);
+        if (mFullscreenBlurView != null) {
+            // Near zero progress the backdrop fades out over the live
+            // workspace instead of being removed in one step: parts of
+            // the recorded snapshot (such as the search bar, whose own
+            // translucency does not record faithfully) differ slightly
+            // from the live views, and the short fade hides that seam.
+            // The same ramp fades the backdrop in when opening starts.
+            mFullscreenBlurView.setAlpha(Math.min(1f, progress / 0.12f));
+            mFullscreenBlurView.invalidate();
+        }
+        if (mFullscreenTitleView != null) {
+            // On open the title becomes solid in step with the icons
+            // (whose alpha finishes over the first 60% of the bloom,
+            // which is about progress 0.85 in this animator's value);
+            // on close it fades with the rest of the folder.
+            mFullscreenTitleView.setAlpha(mFullscreenBlurOpening
+                    ? Math.min(1f, progress / 0.85f) : progress);
+        }
+    }
+
+
+    /**
+     * WitAqua: in fullscreen folder mode the folder contents use white labels
+     * (readable over the blurred wallpaper) and the in-folder name field is
+     * hidden, since the name is shown at the top-left of the screen instead.
+     */
+    private void applyFullscreenFolderStyle() {
+        if (mFolderName != null) {
+            mFolderName.setVisibility(View.INVISIBLE);
+        }
+        mLabelColorOverrides.clear();
+        forceLabelsWhite(mContent);
+        resetFloatingTextAlpha(mContent);
+    }
+
+    // WitAqua: the stock spring animation fades the icons' floating text
+    // alpha to 0 as the folder closes and relies on the next stock open
+    // to animate it back to 1. The fullscreen bloom never animates it, so
+    // after a stock close the labels would stay invisible in fullscreen
+    // mode; reset it to 1 here.
+    private void resetFloatingTextAlpha(View view) {
+        if (view instanceof BubbleTextView) {
+            ((BubbleTextView) view).getFloatingViewTextAlpha().setValue(1f);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                resetFloatingTextAlpha(group.getChildAt(i));
+            }
+        }
+    }
+
+    // WitAqua: views created after the folder opened (an icon dropped into
+    // the folder from outside, or an item added while it is open) are
+    // created with the stock label color, which is dark in the light
+    // theme and unreadable over the blurred backdrop. Whiten them like
+    // the rest of the contents; forceLabelsWhite caches each view's
+    // original color on first sight, so closing the folder still
+    // restores them.
+    private void whitenNewFolderLabels() {
+        if (mFullscreenFolderMode) {
+            forceLabelsWhite(mContent);
+        }
+    }
+
+    private void forceLabelsWhite(View view) {
+        if (view instanceof TextView) {
+            TextView textView = (TextView) view;
+            if (!mLabelColorOverrides.containsKey(textView)) {
+                mLabelColorOverrides.put(textView, textView.getCurrentTextColor());
+            }
+            textView.setTextColor(Color.WHITE);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                forceLabelsWhite(group.getChildAt(i));
+            }
+        }
+    }
+
+    private void restoreFullscreenFolderStyle() {
+        if (!mFullscreenFolderMode) {
+            return;
+        }
+        if (mFolderName != null) {
+            restoreFolderNamePlacement();
+            restoreFolderNameColor();
+            mFolderName.setVisibility(View.VISIBLE);
+        }
+        for (Map.Entry<TextView, Integer> entry : mLabelColorOverrides.entrySet()) {
+            entry.getKey().setTextColor(entry.getValue());
+        }
+        mLabelColorOverrides.clear();
+    }
+
     private void centerAboutIcon() {
         BaseDragLayer.LayoutParams lp = (BaseDragLayer.LayoutParams) getLayoutParams();
         BaseDragLayer parent = mActivityContext.getDragLayer();
         int width = getFolderWidth();
         int height = getFolderHeight();
+
+        if (mFullscreenFolderMode) {
+            // WitAqua fullscreen folder mode: center the folder within the
+            // available area instead of positioning it about its icon.
+            sTempRect.set(mActivityContext.getFolderBoundingBox());
+            int centeredLeft = sTempRect.centerX() - width / 2;
+            int centeredTop = sTempRect.centerY() - height / 2;
+            lp.width = width;
+            lp.height = height;
+            lp.x = Utilities.boundToRange(centeredLeft, sTempRect.left,
+                    sTempRect.right - width);
+            lp.y = Utilities.boundToRange(centeredTop, sTempRect.top,
+                    sTempRect.bottom - height);
+            setPivotX(width / 2f);
+            setPivotY(height / 2f);
+            mBackground.setBounds(0, 0, width, height);
+            return;
+        }
 
         parent.getDescendantRectRelativeToSelf(mFolderIcon, sTempRect);
         int centerX = sTempRect.centerX();
@@ -1520,6 +2087,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             View currentDragView;
             if (mIsExternalDrag) {
                 currentDragView = mContent.createAndAddViewForRank(si, mEmptyCellRank);
+                whitenNewFolderLabels();
 
                 // Actually move the item in the database if it was an external drag. Call this
                 // before creating the view, so that the ItemInfo is updated appropriately.
@@ -1621,6 +2189,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
             if (mContent.areViewsBound()) {
                 mContent.createAndAddViewForRank(item, rank);
+                whitenNewFolderLabels();
             }
             mItemsInvalidated = true;
             updateTextViewFocus();
@@ -1880,6 +2449,11 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                 }
                 return false;
             } else if (!dl.isEventOverView(this, ev)
+                    // WitAqua: in fullscreen folder mode the title view sits
+                    // above this folder in the drag layer; a tap on it is not
+                    // an outside tap (it starts renaming instead).
+                    && !(mFullscreenFolderMode && mFullscreenTitleView != null
+                            && dl.isEventOverView(mFullscreenTitleView, ev))
                     && mLauncherDelegate.interceptOutsideTouch(ev, dl, this)) {
                 return true;
             }
@@ -1909,7 +2483,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             int count = canvas.save();
             canvas.clipPath(mClipPath.getPath());
 
-            mBlurBackgroundHelper.drawFolderBlur(canvas, mClipPath, this);
+            if (!mFullscreenFolderMode) {
+                mBlurBackgroundHelper.drawFolderBlur(canvas, mClipPath, this);
+            }
             mBackground.draw(canvas);
 
             if (!mIsAnimatingClosed) {
@@ -1922,7 +2498,9 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
                 super.dispatchDraw(canvas);
             }
         } else {
-            mBlurBackgroundHelper.drawFolderBlur(canvas, null, this);
+            if (!mFullscreenFolderMode) {
+                mBlurBackgroundHelper.drawFolderBlur(canvas, null, this);
+            }
             mBackground.draw(canvas);
 
             super.dispatchDraw(canvas);
