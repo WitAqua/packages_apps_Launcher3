@@ -36,6 +36,21 @@ constructor() {
 
     open fun drawFolderBlur(canvas: Canvas, pathWrapper: PathWrapper?, view: View) {}
 
+    /**
+     * WitAqua: records what is needed to draw the fullscreen folder blur backdrop. Called
+     * before the folder (and its backdrop view) is added to the drag layer.
+     */
+    open fun prepareFullscreenFolderBlur(folder: Folder) {}
+
+    /** WitAqua: draws the fullscreen folder blur backdrop into [canvas]. */
+    open fun drawFullscreenFolderBlur(canvas: Canvas, view: View) {}
+
+    /**
+     * WitAqua: sets the fullscreen folder blur progress (0 = no blur, 1 = full
+     * blur), animated in sync with the folder's open/close animation.
+     */
+    open fun setFullscreenBlurProgress(progress: Float) {}
+
     open fun folderCloseComplete() {}
 
     open fun isBlurEnabled() = false

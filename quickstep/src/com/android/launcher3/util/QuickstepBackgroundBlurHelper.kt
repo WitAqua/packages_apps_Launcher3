@@ -70,6 +70,48 @@ constructor(
             return
         }
 
+        recordWorkspaceSnapshot(folder)
+    }
+
+    // WitAqua: the fullscreen folder backdrop does not depend on the
+    // blur_on_more_surfaces flag; the workspace snapshot blur works whenever a
+    // snapshot can be recorded, and the cross-window part additionally requires
+    // cross-window blur to be enabled on the device.
+    override fun prepareFullscreenFolderBlur(folder: Folder) {
+        fullscreenBlurProgress = 0f
+        recordWorkspaceSnapshot(folder)
+    }
+
+    // WitAqua: blur strength of the fullscreen folder backdrop, animated by
+    // the folder in sync with its open/close animation (0 = no blur,
+    // 1 = full blur). Both blur layers stay at a fixed full radius and the
+    // progress only cross-fades them, so the blur result is cached and
+    // replayed each frame instead of being recomputed at a new radius
+    // (which dropped frames).
+    private var fullscreenBlurProgress = 0f
+
+    private val fullscreenBlurEffect: RenderEffect by lazy {
+        RenderEffect.createBlurEffect(
+            folderBlurRadius, folderBlurRadius, Shader.TileMode.CLAMP)
+    }
+
+    override fun setFullscreenBlurProgress(progress: Float) {
+        fullscreenBlurProgress = progress
+    }
+
+    override fun drawFullscreenFolderBlur(canvas: Canvas, view: View) {
+        drawFullscreenCrossWindowBlur(canvas, view)
+        drawFullscreenWorkspaceBlur(canvas)
+    }
+
+    // WitAqua: no extra tint is drawn over the status bar / navigation bar
+    // bands. An earlier version of the backdrop darkened them by 20% to
+    // match a dark layer the workspace snapshot then contained; with the
+    // cross-fade backdrop the main area no longer darkens, and the tint
+    // only made the bands visibly darker than the rest of the backdrop
+    // (measured step of about x0.82 at the status bar boundary).
+
+    private fun recordWorkspaceSnapshot(folder: Folder) {
         val folderIcon = folder.folderIcon
         val folderNameVisibility: Int = folderIcon.folderName.visibility
         val isIconVisible = folderIcon.iconVisible
@@ -86,6 +128,59 @@ constructor(
 
         folderIcon.folderName.visibility = folderNameVisibility
         folderIcon.setIconVisible(isIconVisible)
+    }
+
+    private var fullscreenBlurDrawable: BackgroundBlurDrawable? = null
+
+    private fun getFullscreenBlurDrawable(): BackgroundBlurDrawable? {
+        if (!blurState.value) {
+            return null
+        }
+        if (fullscreenBlurDrawable == null) {
+            fullscreenBlurDrawable =
+                activityContext.dragLayer
+                    .getViewRootImpl()
+                    ?.createBackgroundBlurDrawable()
+                    ?.apply {
+                        setBlurRadius(folderBlurRadius.toInt())
+                        setVisible(false, false)
+                    }
+        }
+        return fullscreenBlurDrawable
+    }
+
+    private fun drawFullscreenCrossWindowBlur(canvas: Canvas, view: View) {
+        val d = getFullscreenBlurDrawable() ?: return
+
+        d.setVisible(true, false)
+        d.setAlpha((fullscreenBlurProgress * 255).toInt())
+        d.setBounds(0, 0, view.width, view.height)
+        d.setCornerRadius(0f)
+        d.draw(canvas)
+    }
+
+    private fun drawFullscreenWorkspaceBlur(canvas: Canvas) {
+        if (!workspaceBlurRenderNode.hasDisplayList()) {
+            return
+        }
+        workspaceBlurRenderNode.translationX = 0f
+        workspaceBlurRenderNode.translationY = 0f
+        workspaceBlurRenderNode.setClipToOutline(false)
+        // Cross-fade between the sharp snapshot and the fully blurred one.
+        // The fixed-radius blur is computed once and cached by the render
+        // pipeline; only the layer alphas change per frame.
+        val progress = fullscreenBlurProgress
+        if (progress < 1f) {
+            workspaceBlurRenderNode.setRenderEffect(null)
+            workspaceBlurRenderNode.setAlpha(1f - progress)
+            canvas.drawRenderNode(workspaceBlurRenderNode)
+        }
+        if (progress > 0f) {
+            workspaceBlurRenderNode.setRenderEffect(fullscreenBlurEffect)
+            workspaceBlurRenderNode.setAlpha(progress)
+            canvas.drawRenderNode(workspaceBlurRenderNode)
+        }
+        workspaceBlurRenderNode.setAlpha(1f)
     }
 
     override fun drawFolderBlur(canvas: Canvas, pathWrapper: PathWrapper?, view: View) {
@@ -145,10 +240,12 @@ constructor(
     }
 
     override fun folderCloseComplete() {
+        fullscreenBlurProgress = 0f
         if (workspaceBlurRenderNode.hasDisplayList()) {
             workspaceBlurRenderNode.discardDisplayList()
         }
         folderBlurDrawable?.setVisible(false, false)
+        fullscreenBlurDrawable?.setVisible(false, false)
     }
 
     override fun isBlurEnabled(): Boolean {
