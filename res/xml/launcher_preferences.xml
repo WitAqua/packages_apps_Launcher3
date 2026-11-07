@@ -33,6 +33,13 @@
         android:title="@string/pref_sleep_gesture_title"
         android:summary="@string/pref_sleep_gesture_summary" />
 
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:key="pref_folder_fullscreen_blur"
+        android:persistent="true"
+        android:title="@string/folder_fullscreen_blur_title"
+        android:summary="@string/folder_fullscreen_blur_summary" />
+
     <com.android.launcher3.settings.NotificationDotsPreference
         android:key="pref_icon_badging"
         android:title="@string/notification_dots_title"

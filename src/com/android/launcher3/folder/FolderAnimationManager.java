@@ -30,6 +30,7 @@ import android.animation.ObjectAnimator;
 import android.animation.TimeInterpolator;
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.util.Property;
@@ -187,8 +188,12 @@ public class FolderAnimationManager implements FolderAnimationCreator {
         final float yDistance = initialY - lp.y;
 
         // Set up the Folder background.
-        final int initialColor = Themes.getAttrColor(mContext, R.attr.folderPreviewColor);
-        final int finalColor = Themes.getAttrColor(mContext, R.attr.folderBackgroundColor);
+        // WitAqua: in fullscreen folder mode the folder card stays transparent so
+        // that only the icons float over the fullscreen blur backdrop.
+        final int initialColor = mFolder.isFullscreenFolderMode() ? Color.TRANSPARENT
+                : Themes.getAttrColor(mContext, R.attr.folderPreviewColor);
+        final int finalColor = mFolder.isFullscreenFolderMode() ? Color.TRANSPARENT
+                : Themes.getAttrColor(mContext, R.attr.folderBackgroundColor);
 
         mFolderBackground.mutate();
         mFolderBackground.setColor(mIsOpening ? initialColor : finalColor);

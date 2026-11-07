@@ -261,8 +261,14 @@ class FolderSpringAnimatorSet(val animatorSet: AnimatorSet) {
                 val folderBackground = folder.background as GradientDrawable
                 // Set up the Folder background.
                 val isOpening = animationData.isOpening
-                val initialColor = Themes.getAttrColor(context, R.attr.folderPreviewColor)
-                val finalColor = Themes.getAttrColor(context, R.attr.folderBackgroundColor)
+                // WitAqua: in fullscreen folder mode the folder card stays transparent
+                // so that only the icons float over the fullscreen blur backdrop.
+                val initialColor =
+                    if (folder.isFullscreenFolderMode) Color.TRANSPARENT
+                    else Themes.getAttrColor(context, R.attr.folderPreviewColor)
+                val finalColor =
+                    if (folder.isFullscreenFolderMode) Color.TRANSPARENT
+                    else Themes.getAttrColor(context, R.attr.folderBackgroundColor)
                 folderBackground.mutate()
                 folderBackground.setColor(if (isOpening) initialColor else finalColor)
                 // TODO: convert to spring animation?
